@@ -49,20 +49,17 @@ class SegWitTest(BitcoinTestFramework):
                 "-rpcserialversion=0",
                 "-vbparams=segwit:0:999999999999",
                 "-addresstype=legacy",
-                "-txindex"
             ],
             [
                 "-blockversion=4",
                 "-rpcserialversion=1",
                 "-vbparams=segwit:0:999999999999",
                 "-addresstype=legacy",
-                "-txindex"
             ],
             [
                 "-blockversion=536870915",
                 "-vbparams=segwit:0:999999999999",
                 "-addresstype=legacy",
-                "-txindex"
             ],
         ]
 
@@ -176,13 +173,15 @@ class SegWitTest(BitcoinTestFramework):
         self.log.info("Verify block and transaction serialization rpcs return differing serializations depending on rpc serialization flag")
         assert(self.nodes[2].getblock(block[0], False) != self.nodes[0].getblock(block[0], False))
         assert(self.nodes[1].getblock(block[0], False) == self.nodes[2].getblock(block[0], False))
-        for i in range(len(segwit_tx_list)):
-            tx = FromHex(CTransaction(), self.nodes[2].gettransaction(segwit_tx_list[i])["hex"])
-            assert(self.nodes[2].getrawtransaction(segwit_tx_list[i]) != self.nodes[0].getrawtransaction(segwit_tx_list[i]))
-            assert(self.nodes[1].getrawtransaction(segwit_tx_list[i], 0) == self.nodes[2].getrawtransaction(segwit_tx_list[i]))
-            assert(self.nodes[0].getrawtransaction(segwit_tx_list[i]) != self.nodes[2].gettransaction(segwit_tx_list[i])["hex"])
-            assert(self.nodes[1].getrawtransaction(segwit_tx_list[i]) == self.nodes[2].gettransaction(segwit_tx_list[i])["hex"])
-            assert(self.nodes[0].getrawtransaction(segwit_tx_list[i]) == bytes_to_hex_str(tx.serialize_without_witness()))
+
+        blockhash = self.nodes[2].getblock(block[0])["hash"]
+        for tx_id in segwit_tx_list:
+            tx = FromHex(CTransaction(), self.nodes[2].gettransaction(tx_id)["hex"])
+            assert(self.nodes[2].getrawtransaction(tx_id, False, blockhash) != self.nodes[0].getrawtransaction(tx_id, False, blockhash))
+            assert(self.nodes[1].getrawtransaction(tx_id, False, blockhash) == self.nodes[2].getrawtransaction(tx_id, False, blockhash))
+            assert(self.nodes[0].getrawtransaction(tx_id, False, blockhash) != self.nodes[2].gettransaction(tx_id)["hex"])
+            assert(self.nodes[1].getrawtransaction(tx_id, False, blockhash) == self.nodes[2].gettransaction(tx_id)["hex"])
+            assert(self.nodes[0].getrawtransaction(tx_id, False, blockhash) == bytes_to_hex_str(tx.serialize_without_witness()))
 
         self.log.info("Verify witness txs without witness data are invalid after the fork")
         self.fail_accept(self.nodes[2], 'non-mandatory-script-verify-flag (Witness program hash mismatch) (code 64)', wit_ids[NODE_2][WIT_V0][2], sign=False)
