@@ -7,10 +7,14 @@
 #include <miner.h>
 #include <script/script.h>
 #include <txrebroadcast.h>
+#include <util/time.h>
 
 /** We rebroadcast 3/4 of max block weight to reduce noise due to circumstances
  *  such as miners mining priority transactions. */
 static constexpr unsigned int MAX_REBROADCAST_WEIGHT{3 * MAX_BLOCK_WEIGHT / 4};
+
+/** Default minimum age for a transaction to be rebroadcast */
+static constexpr std::chrono::minutes REBROADCAST_MIN_TX_AGE{30min};
 
 std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 {
@@ -18,6 +22,7 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
+    options.m_skip_inclusion_until = GetTime<std::chrono::microseconds>() - REBROADCAST_MIN_TX_AGE;
 
     // Use CreateNewBlock to identify rebroadcast candidates
     auto block_template = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams, options)
