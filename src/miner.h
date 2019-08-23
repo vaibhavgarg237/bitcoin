@@ -9,7 +9,6 @@
 #include <optional.h>
 #include <primitives/block.h>
 #include <txmempool.h>
-#include <validation.h>
 
 #include <memory>
 #include <stdint.h>
@@ -133,6 +132,7 @@ private:
     bool fIncludeWitness;
     unsigned int nBlockMaxWeight;
     CFeeRate blockMinFeeRate;
+    std::chrono::microseconds m_skip_inclusion_until;
 
     // Information on the current status of the block
     uint64_t nBlockWeight;
@@ -152,6 +152,7 @@ public:
         Options();
         size_t nBlockMaxWeight;
         CFeeRate blockMinFeeRate;
+        std::chrono::microseconds m_skip_inclusion_until;
     };
 
     explicit BlockAssembler(const CTxMemPool& mempool, const CChainParams& params);
@@ -187,7 +188,10 @@ private:
       * only as an extra check in case of suboptimal node configuration */
     bool TestPackageTransactions(const CTxMemPool::setEntries& package) const;
     /** Return true if given transaction from mapTx has already been evaluated,
-      * or if the transaction's cached data in mapTx is incorrect. */
+      * or if the transaction's cached data in mapTx is incorrect.
+      * If m_skip_inclusion_until is set in the options, we will skip
+      * transactions until they meet that age. This is currently used for
+      * rebroadcast logic.*/
     bool SkipMapTxEntry(CTxMemPool::txiter it, indexed_modified_transaction_set& mapModifiedTx, CTxMemPool::setEntries& failedTx) EXCLUSIVE_LOCKS_REQUIRED(m_mempool.cs);
     /** Sort the package in an order that is valid to appear in a block */
     void SortForBlock(const CTxMemPool::setEntries& package, std::vector<CTxMemPool::txiter>& sortedEntries);
