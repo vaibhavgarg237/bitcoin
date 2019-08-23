@@ -111,6 +111,7 @@ std::vector<uint256> CTxMemPool::GetRebroadcastTransactions(bool wtxid)
 
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
+    options.m_skip_inclusion_until = std::chrono::seconds(GetTime()) - REBROADCAST_MIN_TX_AGE;
     CScript dummy_script = CScript();
 
     // Use CreateNewBlock to identify rebroadcast candidates
