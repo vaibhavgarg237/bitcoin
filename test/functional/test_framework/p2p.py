@@ -658,6 +658,7 @@ class P2PDataStore(P2PInterface):
                 for tx in txs:
                     assert tx.hash not in raw_mempool, "{} tx found in mempool".format(tx.hash)
 
+
 class P2PTxInvStore(P2PInterface):
     """A P2PInterface which stores a count of how many times each txid has been announced."""
     def __init__(self):
@@ -665,7 +666,7 @@ class P2PTxInvStore(P2PInterface):
         self.tx_invs_received = defaultdict(int)
 
     def on_inv(self, message):
-        super().on_inv(message) # Send getdata in response.
+        super().on_inv(message)  # Send getdata in response.
         # Store how many times invs have been received for each tx.
         for i in message.inv:
             if (i.type == MSG_TX) or (i.type == MSG_WTX):
