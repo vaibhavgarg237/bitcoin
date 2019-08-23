@@ -12,12 +12,16 @@
  *  such as miners mining priority transactions. */
 static constexpr unsigned int MAX_REBROADCAST_WEIGHT = 3 * MAX_BLOCK_WEIGHT / 4;
 
+/* Default minimum age for a transaction to be rebroadcast */
+static constexpr std::chrono::minutes REBROADCAST_MIN_TX_AGE = std::chrono::minutes{30};
+
 std::vector<uint256> TxRebroadcastCalculator::GetRebroadcastTransactions(bool is_wtxid)
 {
     std::vector<uint256> rebroadcast_txs;
 
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
+    options.m_skip_inclusion_until = GetTime<std::chrono::seconds>() - REBROADCAST_MIN_TX_AGE;
     CScript dummy_script = CScript();
 
     // Use CreateNewBlock to identify rebroadcast candidates
