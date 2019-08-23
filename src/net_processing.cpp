@@ -146,6 +146,8 @@ static constexpr uint32_t MAX_GETCFILTERS_SIZE = 1000;
 static constexpr uint32_t MAX_GETCFHEADERS_SIZE = 2000;
 /** the maximum percentage of addresses from our addrman to return in response to a getaddr message. */
 static constexpr size_t MAX_PCT_ADDR_TO_SEND = 23;
+/** Average delay between rebroadcasts */
+static constexpr auto TX_REBROADCAST_INTERVAL = std::chrono::seconds{60 * 60};
 
 struct COrphanTx {
     // When modifying, adapt the copy of this definition in tests/DoS_tests.
@@ -4317,6 +4319,28 @@ bool PeerManager::SendMessages(CNode* pto)
                     } else {
                         // Use half the delay for outbound peers, as there is less privacy concern for them.
                         pto->m_tx_relay->nNextInvSend = PoissonNextSend(current_time, std::chrono::seconds{INVENTORY_BROADCAST_INTERVAL >> 1});
+                    }
+                }
+
+                // Check for rebroadcasts
+                if (pto->m_next_rebroadcast < current_time) {
+                    // Schedule next rebroadcast
+                    bool fFirst = (pto->m_next_rebroadcast.count() == 0);
+                    pto->m_next_rebroadcast = PoissonNextSend(current_time, TX_REBROADCAST_INTERVAL);
+
+                    if (!fFirst) {
+                        std::vector<uint256> rebroadcast_txs = m_mempool.GetRebroadcastTransactions(state.m_wtxid_relay);
+
+                        for (const uint256& hash : rebroadcast_txs) {
+                            LogPrint(BCLog::NET, "Attempt to rebroadcast tx=%s to peer=%d\n", hash.GetHex(), pto->GetId());
+                        }
+
+                        // Add rebroadcast transactions to send queue
+                        // Since it is a set, duplicates will not be added
+                        auto size_before = pto->m_tx_relay->setInventoryTxToSend.size();
+                        pto->m_tx_relay->setInventoryTxToSend.insert(rebroadcast_txs.begin(), rebroadcast_txs.end());
+                        auto size_after = pto->m_tx_relay->setInventoryTxToSend.size();
+                        LogPrint(BCLog::NET, "Added %d rebroadcast transactions to setInventoryTxToSend for peer=%d\n", size_after - size_before, pto->GetId());
                     }
                 }
 

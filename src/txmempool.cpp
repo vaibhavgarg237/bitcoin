@@ -5,9 +5,11 @@
 
 #include <txmempool.h>
 
+#include <chainparams.h>
 #include <consensus/consensus.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
+#include <miner.h>
 #include <optional.h>
 #include <validation.h>
 #include <policy/policy.h>
@@ -97,6 +99,35 @@ void CTxMemPool::UpdateForDescendants(txiter updateIt, cacheMap &cachedDescendan
         }
     }
     mapTx.modify(updateIt, update_descendant_state(modifySize, modifyFee, modifyCount));
+}
+
+std::vector<uint256> CTxMemPool::GetRebroadcastTransactions(bool wtxid)
+{
+    std::vector<uint256> rebroadcast_txs;
+
+    // Don't rebroadcast transactions during importing, reindex, or IBD to
+    // ensure we don't accidentally spam our peers with old transactions.
+    if (::ChainstateActive().IsInitialBlockDownload() || ::fImporting || ::fReindex) return rebroadcast_txs;
+
+    BlockAssembler::Options options;
+    options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
+    CScript dummy_script = CScript();
+
+    // Use CreateNewBlock to identify rebroadcast candidates
+    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler(*this, Params(), options).CreateNewBlock(dummy_script);
+
+    LOCK(cs);
+    for (const CTransactionRef& tx : pblocktemplate->block.vtx) {
+        uint256 txhsh = wtxid ? tx->GetWitnessHash() : tx->GetHash();
+
+        // Confirm the transaction is still in the mempool
+        indexed_transaction_set::const_iterator it = wtxid ? get_iter_from_wtxid(txhsh) : mapTx.find(txhsh);
+        if (it == mapTx.end()) continue;
+
+        rebroadcast_txs.push_back(txhsh);
+    }
+
+    return rebroadcast_txs;
 }
 
 // vHashesToUpdate is the set of transaction hashes from a disconnected block
