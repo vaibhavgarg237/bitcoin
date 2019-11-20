@@ -42,6 +42,9 @@ static constexpr std::chrono::seconds REBROADCAST_MIN_TX_AGE = std::chrono::seco
 // such as miners mining priority txns
 static constexpr unsigned int MAX_REBROADCAST_WEIGHT = 0.75 * MAX_BLOCK_WEIGHT;
 
+// Frequency of updating the cache value applied as a filter on rebroadcast set.
+const std::chrono::microseconds REBROADCAST_FEE_RATE_CACHE_INTERVAL = std::chrono::minutes{20};
+
 struct LockPoints
 {
     // Will be set to the blockchain height and median time past
@@ -590,6 +593,12 @@ public:
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
 
     uint64_t CalculateDescendantMaximum(txiter entry) const EXCLUSIVE_LOCKS_REQUIRED(cs);
+
+    // rebroadcast
+    std::chrono::microseconds m_next_min_fee_cache{0}; //!< timer for updating fee rate cache
+    CBlockIndex* m_tip_at_cache_time;                  //!< block height at time of cache
+    CFeeRate m_cached_fee_rate;                        //!< min package fee rate for block inclusion
+
 private:
     typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
 
@@ -673,11 +682,18 @@ public:
     void RemoveStaged(setEntries& stage, bool updateDescendants, MemPoolRemovalReason reason) EXCLUSIVE_LOCKS_REQUIRED(cs);
 
     /** Identify rebroadcast candidates by using CreateNewBlock with specific
-     * rebroadcast parameters.
+     *  rebroadcast parameters. Then pass candidates through a fee rate filter
+     *  by comparing their package fee rates to the cached fee rate and return
+     *  the remaining set.
      *
      *  @param wtxid Whether the set should return txids or wtxids.
      */
     std::vector<uint256> GetRebroadcastTransactions(bool wtxid);
+
+    /** Assemble a block from the local mempool and update a cache with the
+     *  minimum fee rate for a package to be included.
+     */
+    void CacheMinRebroadcastFee();
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
