@@ -114,6 +114,24 @@ void CScheduler::scheduleFromNow(CScheduler::Function f, int64_t deltaMilliSecon
     schedule(f, boost::chrono::system_clock::now() + boost::chrono::milliseconds(deltaMilliSeconds));
 }
 
+void CScheduler::mockForward(int64_t delta_seconds)
+{
+    {
+        boost::unique_lock<boost::mutex> lock(newTaskMutex);
+
+        std::multimap<boost::chrono::system_clock::time_point, Function> temp_queue;
+        for (const auto& element : taskQueue){
+            boost::chrono::system_clock::time_point new_time = element.first - boost::chrono::milliseconds(1000 * delta_seconds);
+            temp_queue.insert({new_time, element.second});
+        }
+
+        taskQueue = std::move(temp_queue);
+    }
+
+    // notify that the taskQueue has been updated
+    newTaskScheduled.notify_one();
+}
+
 static void Repeat(CScheduler* s, CScheduler::Function f, int64_t deltaMilliSeconds)
 {
     f();

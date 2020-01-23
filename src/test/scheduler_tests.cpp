@@ -155,4 +155,46 @@ BOOST_AUTO_TEST_CASE(singlethreadedscheduler_ordered)
     BOOST_CHECK_EQUAL(counter2, 100);
 }
 
+BOOST_AUTO_TEST_CASE(mockforward)
+{
+    CScheduler scheduler;
+
+    std::atomic<int> counter{0};
+    std::atomic<int>* ptr = &counter;
+    CScheduler::Function dummy = [ptr](){ptr->store(1, std::memory_order_release);};
+
+    // schedule jobs for 2, 5 & 8 minutes into the future
+    int64_t min_in_milli = 60*1000;
+    scheduler.scheduleFromNow(dummy, 2*min_in_milli);
+    scheduler.scheduleFromNow(dummy, 5*min_in_milli);
+    scheduler.scheduleFromNow(dummy, 8*min_in_milli);
+
+    // check taskQueue
+    boost::chrono::system_clock::time_point first, last;
+    size_t nTasks = scheduler.getQueueInfo(first, last);
+    BOOST_CHECK(nTasks == 3);
+
+    boost::thread scheduler_thread(std::bind(&CScheduler::serviceQueue, &scheduler));
+
+    // mock the scheduler forward 5 minutes
+    scheduler.mockForward(5*60);
+
+    MicroSleep(600);
+    scheduler.stop(false);
+    scheduler_thread.join();
+
+    // check that the queue only has one job remaining
+    nTasks = scheduler.getQueueInfo(first, last);
+    BOOST_CHECK(nTasks == 1);
+
+    // check that the dummy function actually ran
+    BOOST_CHECK(counter.load(std::memory_order_acquire) == 1);
+
+    // check that the time of the remaining job has been updated
+    boost::chrono::system_clock::time_point now = boost::chrono::system_clock::now();
+    int delta = boost::chrono::duration_cast<boost::chrono::seconds>(first - now).count();
+    // should be between 2 & 3 minutes from now
+    BOOST_CHECK(delta > 2*60 && delta < 3*60);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

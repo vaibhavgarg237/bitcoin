@@ -55,6 +55,8 @@ public:
     // need more accurate scheduling, don't use this method.
     void scheduleEvery(Function f, int64_t deltaMilliSeconds);
 
+    void mockForward(int64_t delta_seconds);
+
     // To keep things as simple as possible, there is no unschedule.
 
     // Services the queue 'forever'. Should be run in a thread,

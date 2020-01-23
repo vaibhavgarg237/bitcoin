@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <util/system.h>
+#include <scheduler.h>
 
 struct NodeContext;
 namespace boost {
@@ -60,5 +61,6 @@ void SetupServerArgs();
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
+extern CScheduler g_scheduler;
 
 #endif // BITCOIN_INIT_H

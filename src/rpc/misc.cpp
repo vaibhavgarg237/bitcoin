@@ -14,6 +14,8 @@
 #include <util/strencodings.h>
 #include <util/system.h>
 #include <util/validation.h>
+#include <scheduler.h>
+#include <init.h>
 
 #include <stdint.h>
 #include <tuple>
@@ -366,6 +368,29 @@ static UniValue setmocktime(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+// move the scheduler forward x amount into time
+// eg. 10 mins -> then all jobs queued for the next 10 minutes would run.
+static UniValue mockscheduler(const JSONRPCRequest& request)
+{
+        RPCHelpMan{"mockscheduler",
+            "\nBump the scheduler into the future (-regtest only)\n",
+            {
+                {"delta_time", RPCArg::Type::NUM, RPCArg::Optional::NO, "Number of seconds to forward the scheduler into the future." },
+            },
+            RPCResults{},
+            RPCExamples{""},
+        }.Check(request);
+
+    if (!Params().MineBlocksOnDemand())
+        throw std::runtime_error("mockscheduler for regression testing (-regtest mode) only");
+
+    RPCTypeCheck(request.params, {UniValue::VNUM});
+
+    g_scheduler.mockForward(request.params[0].get_int64());
+
+    return NullUniValue;
+}
+
 static UniValue RPCLockedMemoryInfo()
 {
     LockedPool::Stats stats = LockedPoolManager::Instance().stats();
@@ -570,6 +595,7 @@ static const CRPCCommand commands[] =
 
     /* Not shown in help */
     { "hidden",             "setmocktime",            &setmocktime,            {"timestamp"}},
+    { "hidden",             "mockscheduler",          &mockscheduler,          {"frequency"}},
     { "hidden",             "echo",                   &echo,                   {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
     { "hidden",             "echojson",               &echo,                   {"arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"}},
 };
