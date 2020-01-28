@@ -1269,6 +1269,9 @@ bool AppInitMain(NodeContext& node)
     CScheduler::Function serviceLoop = std::bind(&CScheduler::serviceQueue, &scheduler);
     threadGroup.create_thread(std::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
 
+    assert(!node.scheduler);
+    node.scheduler = &scheduler;
+
     // Gather some entropy once per minute.
     scheduler.scheduleEvery([]{
         RandAddPeriodic();
