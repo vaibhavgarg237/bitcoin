@@ -1591,7 +1591,7 @@ void static ProcessGetBlockData(CNode* pfrom, const CChainParams& chainparams, c
     }
 }
 
-void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnman* connman, const CTxMemPool& mempool, const std::atomic<bool>& interruptMsgProc) LOCKS_EXCLUDED(cs_main)
+void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnman* connman, CTxMemPool& mempool, const std::atomic<bool>& interruptMsgProc) LOCKS_EXCLUDED(cs_main)
 {
     AssertLockNotHeld(cs_main);
 
@@ -1641,7 +1641,15 @@ void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnm
                     push = true;
                 }
             }
-            if (!push) {
+
+            if (push) {
+                // We intepret processing a GETDATA for a transaction as a successful initial broadcast
+                // and remove it from our unbroadcast set.
+                int num = WITH_LOCK(mempool.cs, return mempool.m_unbroadcast_txids.erase(inv.hash););
+                if (num) {
+                    LogPrint(BCLog::NET, "Removed %i from m_unbroadcast_txids \n", inv.hash.GetHex());
+                }
+            } else {
                 vNotFound.push_back(inv);
             }
         }
