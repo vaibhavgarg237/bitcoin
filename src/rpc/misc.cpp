@@ -342,15 +342,15 @@ static UniValue signmessagewithprivkey(const JSONRPCRequest& request)
 
 static UniValue setmocktime(const JSONRPCRequest& request)
 {
-            RPCHelpMan{"setmocktime",
-                "\nSet the local time to given timestamp (-regtest only)\n",
-                {
-                    {"timestamp", RPCArg::Type::NUM, RPCArg::Optional::NO, UNIX_EPOCH_TIME + "\n"
-            "   Pass 0 to go back to using the system time."},
-                },
-                RPCResults{},
-                RPCExamples{""},
-            }.Check(request);
+    RPCHelpMan{"setmocktime",
+        "\nSet the local time to given timestamp (-regtest only)\n",
+        {
+            {"timestamp", RPCArg::Type::NUM, RPCArg::Optional::NO, UNIX_EPOCH_TIME + "\n"
+                "   Pass 0 to go back to using the system time."},
+        },
+        RPCResults{},
+        RPCExamples{""},
+    }.Check(request);
 
     if (!Params().IsMockableChain())
         throw std::runtime_error("setmocktime for regression testing (-regtest mode) only");
@@ -370,23 +370,24 @@ static UniValue setmocktime(const JSONRPCRequest& request)
 
 static UniValue mockscheduler(const JSONRPCRequest& request)
 {
-        RPCHelpMan{"mockscheduler",
-            "\nBump the scheduler into the future (-regtest only)\n",
-            {
-                {"delta_time", RPCArg::Type::NUM, RPCArg::Optional::NO, "Number of seconds to forward the scheduler into the future." },
-            },
-            RPCResults{},
-            RPCExamples{""},
-        }.Check(request);
+    RPCHelpMan{"mockscheduler",
+        "\nBump the scheduler into the future (-regtest only)\n",
+        {
+            {"delta_time", RPCArg::Type::NUM, RPCArg::Optional::NO, "Number of seconds to forward the scheduler into the future." },
+        },
+        RPCResults{},
+        RPCExamples{""},
+    }.Check(request);
 
     if (!Params().IsMockableChain()) {
         throw std::runtime_error("mockscheduler is for regression testing (-regtest mode) only");
     }
 
+    // check params are valid values
     RPCTypeCheck(request.params, {UniValue::VNUM});
     int64_t delta_seconds = request.params[0].get_int64();
     if ((delta_seconds <= 0) || (delta_seconds > 3600)) {
-        throw std::runtime_error("delta_time must be between 0 and 3600 seconds (1 hr)");
+        throw std::runtime_error("delta_time must be between 1 and 3600 seconds (1 hr)");
     }
 
     // protect against null pointer dereference

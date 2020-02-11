@@ -55,7 +55,7 @@ public:
     // need more accurate scheduling, don't use this method.
     void scheduleEvery(Function f, int64_t deltaMilliSeconds);
 
-    // Regtest only- mock the scheduler to fast forward in time
+    // Mock the scheduler to fast forward in time.
     // Iterates through items on taskQueue and reschedules them
     // to be delta_seconds sooner.
     void MockForward(boost::chrono::seconds delta_seconds);
