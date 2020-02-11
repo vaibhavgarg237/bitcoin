@@ -116,7 +116,7 @@ void CScheduler::scheduleFromNow(CScheduler::Function f, int64_t deltaMilliSecon
 
 void CScheduler::MockForward(boost::chrono::seconds delta_seconds)
 {
-    assert(delta_seconds.count() > 0 && delta_seconds.count() < 3600);
+    assert(delta_seconds.count() > 0 && delta_seconds < boost::chrono::hours{1});
 
     {
         boost::unique_lock<boost::mutex> lock(newTaskMutex);

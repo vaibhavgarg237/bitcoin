@@ -5,8 +5,6 @@
 #include <random.h>
 #include <scheduler.h>
 
-#include <test/util/setup_common.h>
-
 #include <boost/thread.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -171,9 +169,9 @@ BOOST_AUTO_TEST_CASE(mockforward)
     // check taskQueue
     boost::chrono::system_clock::time_point first, last;
     size_t num_tasks = scheduler.getQueueInfo(first, last);
-    BOOST_CHECK(num_tasks == 3);
+    BOOST_CHECK_EQUAL(num_tasks, size_t(3));
 
-    boost::thread scheduler_thread(std::bind(&CScheduler::serviceQueue, &scheduler));
+    std::thread scheduler_thread([&]() { scheduler.serviceQueue(); });
 
     // bump the scheduler forward 5 minutes
     scheduler.MockForward(boost::chrono::seconds(5*60));
@@ -184,7 +182,7 @@ BOOST_AUTO_TEST_CASE(mockforward)
 
     // check that the queue only has one job remaining
     num_tasks = scheduler.getQueueInfo(first, last);
-    BOOST_CHECK(num_tasks == 1);
+    BOOST_CHECK_EQUAL(num_tasks, size_t(1));
 
     // check that the dummy function actually ran
     BOOST_CHECK_EQUAL(counter, 2);
