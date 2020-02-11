@@ -389,6 +389,9 @@ static UniValue mockscheduler(const JSONRPCRequest& request)
         throw std::runtime_error("delta_time must be between 0 and 3600 seconds (1 hr)");
     }
 
+    // protect against null pointer dereference
+    CHECK_NONFATAL(g_rpc_node);
+    CHECK_NONFATAL(g_rpc_node->scheduler);
     g_rpc_node->scheduler->MockForward(boost::chrono::seconds(delta_seconds));
 
     return NullUniValue;
