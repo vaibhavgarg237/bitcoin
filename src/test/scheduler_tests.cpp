@@ -169,7 +169,7 @@ BOOST_AUTO_TEST_CASE(mockforward)
     // check taskQueue
     boost::chrono::system_clock::time_point first, last;
     size_t num_tasks = scheduler.getQueueInfo(first, last);
-    BOOST_CHECK_EQUAL(num_tasks, size_t(3));
+    BOOST_CHECK_EQUAL(num_tasks, 3ul);
 
     std::thread scheduler_thread([&]() { scheduler.serviceQueue(); });
 
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(mockforward)
 
     // check that the queue only has one job remaining
     num_tasks = scheduler.getQueueInfo(first, last);
-    BOOST_CHECK_EQUAL(num_tasks, size_t(1));
+    BOOST_CHECK_EQUAL(num_tasks, 1ul);
 
     // check that the dummy function actually ran
     BOOST_CHECK_EQUAL(counter, 2);
