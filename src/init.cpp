@@ -157,7 +157,6 @@ NODISCARD static bool CreatePidFile()
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 static boost::thread_group threadGroup;
-static CScheduler scheduler;
 
 void Interrupt(NodeContext& node)
 {
@@ -1265,19 +1264,19 @@ bool AppInitMain(NodeContext& node)
         }
     }
 
+    assert(!node.scheduler);
+    node.scheduler = MakeUnique<CScheduler>();
+
     // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop = std::bind(&CScheduler::serviceQueue, &scheduler);
+    CScheduler::Function serviceLoop = std::bind(&CScheduler::serviceQueue, node.scheduler.get());
     threadGroup.create_thread(std::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
 
-    assert(!node.scheduler);
-    node.scheduler = &scheduler;
-
     // Gather some entropy once per minute.
-    scheduler.scheduleEvery([]{
+    node.scheduler->scheduleEvery([]{
         RandAddPeriodic();
     }, 60000);
 
-    GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
+    GetMainSignals().RegisterBackgroundSignalScheduler(*node.scheduler);
 
     // Create client interfaces for wallets that are supposed to be loaded
     // according to -wallet and -disablewallet options. This only constructs
@@ -1327,7 +1326,7 @@ bool AppInitMain(NodeContext& node)
     assert(!node.connman);
     node.connman = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
 
-    node.peer_logic.reset(new PeerLogicValidation(node.connman.get(), node.banman.get(), scheduler));
+    node.peer_logic.reset(new PeerLogicValidation(node.connman.get(), node.banman.get(), *node.scheduler));
     RegisterValidationInterface(node.peer_logic.get());
 
     // sanitize comments per BIP-0014, format user agent and check total size
@@ -1819,7 +1818,7 @@ bool AppInitMain(NodeContext& node)
             connOptions.m_specified_outgoing = connect;
         }
     }
-    if (!node.connman->Start(scheduler, connOptions)) {
+    if (!node.connman->Start(*node.scheduler, connOptions)) {
         return false;
     }
 
@@ -1848,11 +1847,11 @@ bool AppInitMain(NodeContext& node)
     uiInterface.InitMessage(_("Done loading").translated);
 
     for (const auto& client : node.chain_clients) {
-        client->start(scheduler);
+        client->start(*node.scheduler);
     }
 
     BanMan* banman = node.banman.get();
-    scheduler.scheduleEvery([banman]{
+    node.scheduler->scheduleEvery([banman]{
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL * 1000);
 
