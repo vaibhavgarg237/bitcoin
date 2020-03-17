@@ -4992,6 +4992,7 @@ bool LoadMempool(CTxMemPool& pool)
     int64_t expired = 0;
     int64_t failed = 0;
     int64_t already_there = 0;
+    int64_t unbroadcast = 0;
     int64_t nNow = GetTime();
 
     try {
@@ -5045,12 +5046,19 @@ bool LoadMempool(CTxMemPool& pool)
         for (const auto& i : mapDeltas) {
             pool.PrioritiseTransaction(i.first, i.second);
         }
+
+        {
+            LOCK(pool.cs);
+            file >> pool.m_unbroadcast_txids;
+            unbroadcast = pool.m_unbroadcast_txids.size();
+        }
+
     } catch (const std::exception& e) {
         LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n", e.what());
         return false;
     }
 
-    LogPrintf("Imported mempool transactions from disk: %i succeeded, %i failed, %i expired, %i already there\n", count, failed, expired, already_there);
+    LogPrintf("Imported mempool transactions from disk: %i succeeded, %i failed, %i expired, %i already there, %i waiting for initial broadcast\n", count, failed, expired, already_there, unbroadcast);
     return true;
 }
 
@@ -5094,6 +5102,13 @@ bool DumpMempool(const CTxMemPool& pool)
         }
 
         file << mapDeltas;
+
+        {
+            LOCK(pool.cs);
+            LogPrintf("Writing %d unbroadcast transactions to disk.\n", pool.m_unbroadcast_txids.size());
+            file << pool.m_unbroadcast_txids;
+        }
+
         if (!FileCommit(file.Get()))
             throw std::runtime_error("FileCommit failed");
         file.fclose();
