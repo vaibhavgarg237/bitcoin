@@ -293,6 +293,10 @@ struct CNodeState {
     //! Time of last new block announcement
     int64_t m_last_block_announcement;
 
+    /*
+     * A transaction that has been announced to us by a single peer. We store
+     * the txid and the request time.
+     */
     struct AnnouncedTx {
         //! The txid of the announced transaction.
         uint256 m_hash;
@@ -321,21 +325,33 @@ struct CNodeState {
     };
 
     /*
-     * State associated with transaction download.
+     * State associated with transaction download for a single peer.
+     *
+     * Tx download design goals:
+     *
+     * - Request a transaction from one peer at a time to avoid wasting
+     *   bandwidth.
+     * - Prefer downloading from outbound peers. This makes it more difficult
+     *   for adversaries to slow down or prevent tx relay to us, and for spy
+     *   nodes to map the topology of the tx relay network.
+     * - Limit the number of pending announced transactions and transactions
+     *   in flight from any peer.
+     * - Timeout transaction download from a peer after a reasonable period
+     *   and attempt to download from another peer that has announced
+     *   the same transaction. Again, prefer outbound peers.
      *
      * Tx download algorithm:
      *
-     *   When inv comes in, queue up (process_time, txid) inside the peer's
-     *   CNodeState (m_tx_process_time) as long as m_tx_announced for the peer
-     *   isn't too big (MAX_PEER_TX_ANNOUNCEMENTS).
+     *   When an inv is received from a peer, queue the txid along with a
+     *   request time, as long as there aren't too many announced transactions
+     *   already pending from this peer(MAX_PEER_TX_ANNOUNCEMENTS).
      *
-     *   The process_time for a transaction is set to nNow for outbound peers,
-     *   nNow + 2 seconds for inbound peers. This is the time at which we'll
-     *   consider trying to request the transaction from the peer in
-     *   SendMessages(). The delay for inbound peers is to allow outbound peers
-     *   a chance to announce before we request from inbound peers, to prevent
-     *   an adversary from using inbound connections to blind us to a
-     *   transaction (InvBlock).
+     *   The request time is set to now for outbound peers, and now + 2 seconds
+     *   for inbound peers. This is the earliest time we'll consider trying to
+     *   request the transaction from that peer in SendMessages(). The delay
+     *   for inbound peers is to allow outbound peers a chance to announce
+     *   before we request from inbound peers, to prevent an adversary from
+     *   using inbound connections to blind us to a transaction (InvBlock).
      *
      *   When we call SendMessages() for a given peer,
      *   we will loop over the transactions in m_tx_process_time, looking
@@ -348,22 +364,31 @@ struct CNodeState {
      *   requests amongst our peers.
      *
      *   For transactions that we still need but we have already recently
-     *   requested from some other peer, we'll reinsert (process_time, txid)
-     *   back into the peer's m_tx_process_time at the point in the future at
-     *   which the most recent GETDATA request would time out (ie
-     *   GETDATA_TX_INTERVAL + the request time stored in g_already_asked_for).
-     *   We add an additional delay for inbound peers, again to prefer
-     *   attempting download from outbound peers first.
+     *   requested from another peer, we'll reset the request time for this
+     *   peer to the point in the future at which the most recent GETDATA
+     *   request would time out. We add an additional delay for inbound peers,
+     *   again to prefer attempting download from outbound peers first.
      *   We also add an extra small random delay up to 2 seconds
      *   to avoid biasing some peers over others. (e.g., due to fixed ordering
      *   of peer processing in ThreadMessageHandler).
      *
-     *   When we receive a transaction from a peer, we remove the txid from the
-     *   peer's m_tx_in_flight set and from their recently announced set
-     *   (m_tx_announced).  We also clear g_already_asked_for for that entry, so
-     *   that if somehow the transaction is not accepted but also not added to
-     *   the reject filter, then we will eventually redownload from other
-     *   peers.
+     *   When we receive a transaction from a peer, we remove the txid from
+     *   here and from the g_already_asked_for for that entry, so that if
+     *   somehow the transaction is not accepted but also not added to the
+     *   reject filter, then we will eventually redownload from other peers.
+     *
+     *   Periodically (every TX_EXPIRY_INTERVAL minutes on average), we'll
+     *   clear out any transactions that have been in-flight for more than
+     *   TX_EXPIRY_INTERVAL minutes from that peer.
+     *
+     * Class invariants:
+     *
+     * - m_txs is bounded by MAX_PEER_TX_ANNOUNCEMENTS
+     * - m_requested_txs is bounded by MAX_PEER_TX_IN_FLIGHT
+     * - every tx in m_txs is EITHER in m_announced_txs OR m_requested_txs
+     * - entries are cleared out from m_announced_txs as current_time advances
+     * - entries are cleared out from m_requested_txs when the peer responds
+     *   to the request or after an expiry time
      */
     class TxDownloadState {
     private:
@@ -382,6 +407,8 @@ struct CNodeState {
         std::chrono::microseconds m_check_expiry_timer{0};
 
     public:
+        // The peer has sent us an INV. Keep track of the hash and when to
+        // request the transaction from this peer.
         void AddAnnouncedTx(uint256 hash, std::chrono::microseconds request_time)
         {
             // Check if we have too many queued announcements from this peer,
@@ -393,6 +420,9 @@ struct CNodeState {
             m_announced_txs.emplace(announced_tx);
         };
 
+        // We have requested this transaction from another peer. Reset this
+        // peer's request time for this transaction to after the outstanding
+        // request times out.
         void RequeueTx(uint256 hash, std::chrono::microseconds request_time)
         {
             auto it = m_txs.find(hash);
@@ -402,6 +432,8 @@ struct CNodeState {
             m_announced_txs.insert(it->second);
         };
 
+        // We sent this peer a GETDATA for this transaction. Save the request
+        // time so we can expire it if the peer doesn't respond.
         void RequestSent(uint256 hash, std::chrono::microseconds request_time)
         {
             auto it = m_txs.find(hash);
@@ -417,6 +449,8 @@ struct CNodeState {
             return m_requested_txs.size() >= MAX_PEER_TX_IN_FLIGHT;
         }
 
+        // Transaction has either been received or expired. No longer request
+        // it from this peer.
         void RemoveTx(uint256 hash)
         {
             auto it = m_txs.find(hash);
@@ -426,6 +460,9 @@ struct CNodeState {
             m_txs.erase(hash);
         }
 
+        // For robustness, expire old requests after a long timeout, so that
+        // we can resume downloading transactions from a peer even if they
+        // were unresponsive in the past.
         void ExpireOldAnnouncedTxs(std::chrono::microseconds current_time, NodeId nodeid)
         {
             if (m_check_expiry_timer > current_time) return;
@@ -435,17 +472,20 @@ struct CNodeState {
 
             while (m_requested_txs.size() != 0) {
                 auto it = m_requested_txs.begin();
-                // m_requested_txs are ordered by time
+                // m_requested_txs are ordered by time. If we encounter a
+                // transaction after the expiry time, we're done.
                 if ((*it)->m_timestamp > current_time - TX_EXPIRY_INTERVAL) return;
                 LogPrint(BCLog::NET, "timeout of inflight tx %s from peer=%d\n", (*it)->m_hash.ToString(), nodeid);
                 RemoveTx((*it)->m_hash);
             }
         }
 
+        // Get a list of all transactions that are ready to be requested.
         void GetAnnouncedTxsToRequest(std::chrono::microseconds current_time, std::vector<uint256>& txs_to_request)
         {
             for (auto it = m_announced_txs.begin(); it != m_announced_txs.end(); ++it) {
-                // m_announced_txs are ordered by time
+                // m_announced_txs are ordered by time. If we encounter
+                // a transaction after the current time, we're done.
                 if ((*it)->m_timestamp > current_time) return;
                 txs_to_request.push_back((*it)->m_hash);
             }
@@ -4091,11 +4131,8 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
         // Message: getdata (non-blocks)
         //
 
-        // For robustness, expire old requests after a long timeout, so that
-        // we can resume downloading transactions from a peer even if they
-        // were unresponsive in the past.
-        // Eventually we should consider disconnecting peers, but this is
-        // conservative.
+        // Expire old requests. Eventually we should consider disconnecting
+        // peers, but this is conservative.
         state.m_tx_download.ExpireOldAnnouncedTxs(current_time, pto->GetId());
 
         std::vector<uint256> txs_to_request;
