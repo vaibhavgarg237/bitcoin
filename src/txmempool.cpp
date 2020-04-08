@@ -412,11 +412,25 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
         GetMainSignals().TransactionRemovedFromMempool(ptx);
     }
 
-    const uint256 hash = it->GetTx().GetHash();
-    for (const CTxIn& txin : it->GetTx().vin)
-        mapNextTx.erase(txin.prevout);
+    const CTransaction tx = it->GetTx();
 
-    if (mempool.m_unbroadcast_txids.erase(hash)) {
+    const uint256 hash = tx.GetHash();
+    for (const CTxIn& txin : tx.vin) {
+        mapNextTx.erase(txin.prevout);
+    }
+
+    const uint256 witness_hash = tx.GetWitnessHash();
+    std::unordered_map<uint256, uint256> unbroadcast = mempool.m_unbroadcast_txids;
+    bool erased = false;
+
+    auto result = unbroadcast.find(hash);
+    if (result != unbroadcast.end()){
+        unbroadcast.erase(result->second);
+        unbroadcast.erase(result->first);
+        erased = true;
+    }
+
+    if (erased) {
         LogPrint(BCLog::NET, "Removed %i from m_unbroadcast_txids before confirmation that txn was sent out. \n", hash.GetHex());
     }
 

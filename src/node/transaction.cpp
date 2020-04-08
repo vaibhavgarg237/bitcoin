@@ -78,12 +78,19 @@ TransactionError BroadcastTransaction(NodeContext& node, const CTransactionRef t
     }
 
     if (relay) {
+        tx_witness_hash = tx->GetWitnessHash();
+
         // the mempool tracks locally submitted transactions to make a
         // best-effort of initial broadcast
-        WITH_LOCK(node.mempool->cs, node.mempool->m_unbroadcast_txids.insert(hashTx));
+        {
+            LOCK(node.mempool->cs);
+            std::unordered_map<uint256, uint256> unbroadcast_set = node.mempool->m_unbroadcast_txids;
+            unbroadcast_set[hashTx] = tx_witness_hash;
+            unbroadcast_set[tx_witness_hash] = hashTx;
+        }
 
         LOCK(cs_main);
-        RelayTransaction(hashTx, tx->GetWitnessHash(), *node.connman);
+        RelayTransaction(hashTx, tx_witness_hash, *node.connman);
     }
 
     return TransactionError::OK;

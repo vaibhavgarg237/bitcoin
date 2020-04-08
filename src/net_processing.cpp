@@ -795,6 +795,11 @@ void PeerLogicValidation::InitializeNode(CNode *pnode) {
 void PeerLogicValidation::ReattemptInitialBroadcast(CScheduler& scheduler) const
 {
     std::set<uint256> unbroadcast_txids;
+
+    {
+        LOCK(m_mempool.cs);
+    }
+
     WITH_LOCK(m_mempool.cs, unbroadcast_txids = m_mempool.m_unbroadcast_txids);
 
     for (const uint256& txid : unbroadcast_txids) {
