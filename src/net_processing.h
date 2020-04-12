@@ -207,9 +207,6 @@ private:
     //  request time
     std::set<std::shared_ptr<AnnouncedTx>, AnnouncedTxTimeCompare> m_requested_txs;
 
-    //! Periodically check for stuck getdata requests
-    std::chrono::microseconds m_check_expiry_timer{0};
-
 public:
     // The peer has sent us an INV. Keep track of the hash and when to
     // request the transaction from this peer.

@@ -716,11 +716,6 @@ void TxDownloadState::RemoveTx(uint256 hash)
 
 void TxDownloadState::ExpireOldAnnouncedTxs(std::chrono::microseconds current_time, NodeId nodeid)
 {
-    if (m_check_expiry_timer > current_time) return;
-    // On average, we do this check every TX_EXPIRY_INTERVAL. Randomize
-    // so that we're not doing this for all peers at the same time.
-    m_check_expiry_timer = current_time + TX_EXPIRY_INTERVAL / 2 + GetRandMicros(TX_EXPIRY_INTERVAL);
-
     while (m_requested_txs.size() != 0) {
         auto it = m_requested_txs.begin();
         // m_requested_txs are ordered by time. If we encounter a
