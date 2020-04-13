@@ -105,12 +105,12 @@ struct AnnouncedTx {
     //! The txid of the announced transaction.
     uint256 m_hash;
 
-    //! The timestamp for requesting the transaction from this peer:
+    //! A timestamp for this transaction from this peer:
     //  - for transactions which are announced but not yet requested,
     //    this is the next time that we'll consider downloading the
     //    transaction from this peer.
     //  - for AnnouncedTx which we've requested, this is the time that we
-    //    requested the transaction from this peer.
+    //    will expire the transaction from this peer.
     std::chrono::microseconds m_timestamp;
 
     AnnouncedTx(uint256 hash, std::chrono::microseconds timestamp) :
@@ -203,8 +203,7 @@ private:
     //  peer, ordered by request time
     std::set<std::shared_ptr<AnnouncedTx>, AnnouncedTxTimeCompare> m_announced_txs;
 
-    //! Transactions that we have requested from this peer, ordered by
-    //  request time
+    //! Transactions that we have requested from this peer, ordered by expiry time
     std::set<std::shared_ptr<AnnouncedTx>, AnnouncedTxTimeCompare> m_requested_txs;
 
 public:
@@ -217,9 +216,9 @@ public:
     // request times out.
     void RequeueTx(uint256 hash, std::chrono::microseconds request_time);
 
-    // We sent this peer a GETDATA for this transaction. Save the request
+    // We sent this peer a GETDATA for this transaction. Save the expiry
     // time so we can expire it if the peer doesn't respond.
-    void RequestSent(uint256 hash, std::chrono::microseconds request_time);
+    void SetRequestExpiry(uint256 hash, std::chrono::microseconds expiry_time);
 
     // Don't request too many transactions from a peer simultaneously.
     bool MaxRequestInFlight();

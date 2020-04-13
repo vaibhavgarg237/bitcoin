@@ -691,12 +691,12 @@ void TxDownloadState::RequeueTx(uint256 hash, std::chrono::microseconds request_
     m_announced_txs.insert(it->second);
 };
 
-void TxDownloadState::RequestSent(uint256 hash, std::chrono::microseconds request_time)
+void TxDownloadState::SetRequestExpiry(uint256 hash, std::chrono::microseconds expiry_time)
 {
     auto it = m_txs.find(hash);
     if (it == m_txs.end()) return;
     m_announced_txs.erase(it->second);
-    it->second->m_timestamp = request_time;
+    it->second->m_timestamp = expiry_time;
     m_requested_txs.insert(it->second);
 }
 
@@ -720,7 +720,7 @@ void TxDownloadState::ExpireOldAnnouncedTxs(std::chrono::microseconds current_ti
         auto it = m_requested_txs.begin();
         // m_requested_txs are ordered by time. If we encounter a
         // transaction after the expiry time, we're done.
-        if ((*it)->m_timestamp > current_time - TX_EXPIRY_INTERVAL) return;
+        if ((*it)->m_timestamp > current_time) return;
         LogPrint(BCLog::NET, "timeout of inflight tx %s from peer=%d\n", (*it)->m_hash.ToString(), nodeid);
         RemoveTx((*it)->m_hash);
     }
@@ -4018,7 +4018,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                         vGetData.clear();
                     }
                     UpdateTxRequestTime(inv.hash, current_time);
-                    state.m_tx_download.RequestSent(txid, current_time);
+                    state.m_tx_download.SetRequestExpiry(txid, current_time + TX_EXPIRY_INTERVAL);
                 } else {
                     // This transaction is in flight from someone else; queue
                     // up processing to happen after the download times out
