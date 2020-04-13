@@ -113,8 +113,12 @@ struct AnnouncedTx {
     //    will expire the transaction from this peer.
     std::chrono::microseconds m_timestamp;
 
-    AnnouncedTx(uint256 hash, std::chrono::microseconds timestamp) :
-        m_hash(hash), m_timestamp(timestamp)  {}
+    //! After a certain amount of time, prefer redundancy to bandwidth
+    //  savings and request the transaction from this peer.
+    std::chrono::microseconds m_deadline;
+
+    AnnouncedTx(uint256 hash, std::chrono::microseconds timestamp, std::chrono::microseconds deadline) :
+        m_hash(hash), m_timestamp(timestamp), m_deadline(deadline)  {}
 };
 
 //! Compare function for AnnouncedTxs. Sorts first on the request time, and then
@@ -209,7 +213,7 @@ private:
 public:
     // The peer has sent us an INV. Keep track of the hash and when to
     // request the transaction from this peer.
-    void AddAnnouncedTx(uint256 hash, std::chrono::microseconds request_time);
+    void AddAnnouncedTx(uint256 hash, std::chrono::microseconds request_time, std::chrono::microseconds deadline);
 
     // We have requested this transaction from another peer. Reset this
     // peer's request time for this transaction to after the outstanding
@@ -233,6 +237,8 @@ public:
     void ExpireOldAnnouncedTxs(std::chrono::microseconds current_time, NodeId nodeid);
 
     // Get a list of all transactions that are ready to be requested.
-    void GetAnnouncedTxsToRequest(std::chrono::microseconds current_time, std::vector<uint256>& txs_to_request);
+    // Also return whether the tx has passed its deadline and we should
+    // force a request.
+    void GetAnnouncedTxsToRequest(std::chrono::microseconds current_time, std::vector<std::pair<uint256, bool>>& txs_to_request);
 };
 #endif // BITCOIN_NET_PROCESSING_H
