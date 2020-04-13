@@ -76,6 +76,9 @@ static constexpr std::chrono::microseconds GETDATA_TX_INTERVAL{std::chrono::seco
 static constexpr std::chrono::microseconds MAX_GETDATA_RANDOM_DELAY{std::chrono::seconds{2}};
 /** How long to wait (in microseconds) before expiring an in-flight getdata request to a peer */
 static constexpr std::chrono::microseconds TX_EXPIRY_INTERVAL{GETDATA_TX_INTERVAL * 10};
+/** How long to wait before expiring a GETDATA request after receiving a NOTFOUND */
+static constexpr std::chrono::microseconds NOTFOUND_EXPIRY_DELAY{std::chrono::seconds{4}};
+
 static_assert(INBOUND_PEER_TX_DELAY >= MAX_GETDATA_RANDOM_DELAY,
 "To preserve security, MAX_GETDATA_RANDOM_DELAY should not exceed INBOUND_PEER_DELAY");
 /** Limit to avoid sending big packets. Not used in processing incoming GETDATA for compatibility */
@@ -696,6 +699,8 @@ void TxDownloadState::SetRequestExpiry(uint256 hash, std::chrono::microseconds e
     auto it = m_txs.find(hash);
     if (it == m_txs.end()) return;
     m_announced_txs.erase(it->second);
+    // Transaction might be already requested if we are processing a NOTFOUND
+    m_requested_txs.erase(it->second);
     it->second->m_timestamp = expiry_time;
     m_requested_txs.insert(it->second);
 }
@@ -3212,11 +3217,13 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
         std::vector<CInv> vInv;
         vRecv >> vInv;
         if (vInv.size() <= MAX_PEER_TX_IN_FLIGHT + MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+            std::chrono::microseconds current_time = GetTime<std::chrono::microseconds>();
+
             for (CInv &inv : vInv) {
                 if (inv.type == MSG_TX || inv.type == MSG_WITNESS_TX) {
-                    // If we receive a NOTFOUND message for a txid we requested, erase
-                    // it from our data structures for this peer.
-                    state->m_tx_download.RemoveTx(inv.hash);
+                    // If we receive a NOTFOUND message for a txid we requested,
+                    // update expiry time to be NOTFOUND_EXPIRY_DELAY from now.
+                    state->m_tx_download.SetRequestExpiry(inv.hash, current_time + NOTFOUND_EXPIRY_DELAY);
                 }
             }
         }
