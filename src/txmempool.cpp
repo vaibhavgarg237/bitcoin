@@ -417,8 +417,8 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
     for (const CTxIn& txin : it->GetTx().vin)
         mapNextTx.erase(txin.prevout);
 
-    if (mempool.m_unbroadcast_txids.erase(hash)) {
-        LogPrint(BCLog::NET, "Removed %i from m_unbroadcast_txids before confirmation that txn was sent out. \n", hash.GetHex());
+    if (mempool.RemoveUnbroadcastTx(hash)) {
+        LogPrint(BCLog::MEMPOOL, "Removed %i from set of unbroadcast txns before confirmation that txn was sent out. \n", hash.GetHex());
     }
 
     if (vTxHashes.size() > 1) {

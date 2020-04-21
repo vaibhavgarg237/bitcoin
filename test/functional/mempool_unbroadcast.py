@@ -11,9 +11,9 @@ from test_framework.mininode import P2PTxInvStore
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
-    disconnect_nodes,
     connect_nodes,
     create_confirmed_utxos,
+    disconnect_nodes,
 )
 
 
@@ -82,23 +82,18 @@ class MempoolUnbroadcastTest(BitcoinTestFramework):
         self.log.info("Test that transactions removed from mempool are removed from unbroadcast set")
         node = self.nodes[0]
         disconnect_nodes(node, 1)
+        node.disconnect_p2ps
 
         # since the node doesn't have any connections, it will not receive
         # any GETDATAs & thus the transaction will remain in the unbroadcast set.
         addr = node.getnewaddress()
         txhsh = node.sendtoaddress(addr, 0.0001)
-        self.nodes[0].generate(1)
 
-        # add a connection to node
-        conn = node.add_p2p_connection(P2PTxInvStore())
-
-        # the transaction should have been removed from the unbroadcast set
-        # since it was removed from the mempool for MemPoolRemovalReason::BLOCK.
-        # verify by checking it isn't broadcast to the node's new connection.
-        time.sleep(5)
-        txid = int(txhsh, 16)
-        assert txid not in conn.get_invs()
-
+        # check transaction was removed from unbroadcast set due to presence in
+        # a block
+        removal_reason = "Removed {} from set of unbroadcast txns before confirmation that txn was sent out.".format(txhsh)
+        with node.assert_debug_log(expected_msgs=removal_reason):
+            node.generate(1)
 
 if __name__ == "__main__":
     MempoolUnbroadcastTest().main()

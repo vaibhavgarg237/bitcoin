@@ -534,9 +534,6 @@ public:
     const setEntries & GetMemPoolChildren(txiter entry) const EXCLUSIVE_LOCKS_REQUIRED(cs);
     uint64_t CalculateDescendantMaximum(txiter entry) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
-    // track locally submitted transactions & periodically retry initial broadcast
-    std::set<uint256> m_unbroadcast_txids GUARDED_BY(cs);
-
 private:
     typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
 
@@ -552,6 +549,9 @@ private:
     void UpdateChild(txiter entry, txiter child, bool add);
 
     std::vector<indexed_transaction_set::const_iterator> GetSortedDepthAndScore() const EXCLUSIVE_LOCKS_REQUIRED(cs);
+
+    /** track locally submitted transactions to periodically retry initial broadcast */
+    std::set<uint256> m_unbroadcast_txids GUARDED_BY(cs);
 
 public:
     indirectmap<COutPoint, const CTransaction*> mapNextTx GUARDED_BY(cs);
@@ -701,6 +701,22 @@ public:
     std::vector<TxMempoolInfo> infoAll() const;
 
     size_t DynamicMemoryUsage() const;
+
+    inline void AddUnbroadcastTx(const uint256& txid) {
+        LOCK(cs);
+        m_unbroadcast_txids.insert(txid);
+    }
+
+    inline bool RemoveUnbroadcastTx(const uint256& txid) {
+        LOCK(cs);
+        return m_unbroadcast_txids.erase(txid) ? true : false;
+    }
+
+    // TODO: verify this is returning a copy
+    const inline std::set<uint256> GetUnbroadcastTxs() const {
+        LOCK(cs);
+        return m_unbroadcast_txids;
+    }
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update

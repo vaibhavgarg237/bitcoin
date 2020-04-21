@@ -779,18 +779,17 @@ void PeerLogicValidation::InitializeNode(CNode *pnode) {
         PushNodeVersion(pnode, connman, GetTime());
 }
 
-// Note: unbroadcast transactions will be filtered through filterInventoryKnown
 void PeerLogicValidation::ReattemptInitialBroadcast(CScheduler& scheduler) const
 {
-    std::set<uint256> unbroadcast_txids;
-    WITH_LOCK(m_mempool.cs, unbroadcast_txids = m_mempool.m_unbroadcast_txids);
+    std::set<uint256> unbroadcast_txids = m_mempool.GetUnbroadcastTxs();
 
     for (const uint256& txid : unbroadcast_txids) {
         RelayTransaction(txid, *connman);
     }
 
     // schedule next run for 10-15 minutes in the future
-    const std::chrono::milliseconds delta = std::chrono::milliseconds(10 * 60 * 1000 + GetRand(5 * 60 * 1000));
+    //const std::chrono::milliseconds delta = std::chrono::milliseconds(10 * 60 * 1000 + GetRand(5 * 60 * 1000));
+    const std::chrono::milliseconds delta = std::chrono::minutes{10} + GetRandMillis(std::chrono::minutes{5});
     scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta);
 }
 
@@ -1625,11 +1624,10 @@ void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnm
             }
 
             if (push) {
-                // We intepret processing a GETDATA for a transaction as a successful initial broadcast
+                // We intepret fulfilling a GETDATA for a transaction as a successful initial broadcast
                 // and remove it from our unbroadcast set.
-                int num = WITH_LOCK(mempool.cs, return mempool.m_unbroadcast_txids.erase(inv.hash););
-                if (num) {
-                    LogPrint(BCLog::NET, "Removed %i from m_unbroadcast_txids \n", inv.hash.GetHex());
+                if (mempool.RemoveUnbroadcastTx(inv.hash)) {
+                    LogPrint(BCLog::NET, "Removed %i from the set of unbroadcast txns\n", inv.hash.GetHex());
                 }
             } else {
                 vNotFound.push_back(inv);

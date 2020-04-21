@@ -5026,9 +5026,16 @@ bool LoadMempool(CTxMemPool& pool)
         }
 
         {
+            // TODO: fix double lock
             LOCK(pool.cs);
-            file >> pool.m_unbroadcast_txids;
-            unbroadcast = pool.m_unbroadcast_txids.size();
+            std::set<uint256> unbroadcast_txids;
+            file >> unbroadcast_txids;
+
+            for (const auto& txid : unbroadcast_txids) {
+                pool.AddUnbroadcastTx(txid);
+            }
+
+            unbroadcast = unbroadcast_txids.size();
         }
 
     } catch (const std::exception& e) {
@@ -5083,8 +5090,9 @@ bool DumpMempool(const CTxMemPool& pool)
 
         {
             LOCK(pool.cs);
-            LogPrintf("Writing %d unbroadcast transactions to disk.\n", pool.m_unbroadcast_txids.size());
-            file << pool.m_unbroadcast_txids;
+            std::set<uint256> unbroadcast_txids = pool.GetUnbroadcastTxs();
+            LogPrintf("Writing %d unbroadcast transactions to disk.\n", unbroadcast_txids.size());
+            file << unbroadcast_txids;
         }
 
         if (!FileCommit(file.Get()))
