@@ -1714,7 +1714,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
             for (const std::string& strAddr : connect)
             {
                 CAddress addr(CService(), NODE_NONE);
-                OpenNetworkConnection(addr, false, nullptr, strAddr.c_str(), false, false, ConnectionType::MANUAL);
+                OpenNetworkConnection(addr, false, nullptr, strAddr.c_str(), false, ConnectionType::MANUAL);
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
                     if (!interruptNet.sleep_for(std::chrono::milliseconds(500)))
@@ -1877,7 +1877,8 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
             // well for sanity.)
             bool block_relay_only = nOutboundBlockRelay < m_max_outbound_block_relay && !fFeeler && nOutboundFullRelay >= m_max_outbound_full_relay;
 
-            OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant, nullptr, false, fFeeler, ConnectionType::OUTBOUND, block_relay_only);
+            ConnectionType conn_type = (fFeeler ? ConnectionType::FEELER : ConnectionType::OUTBOUND);
+            OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant, nullptr, false, conn_type, block_relay_only);
         }
     }
 }
@@ -1952,7 +1953,7 @@ void CConnman::ThreadOpenAddedConnections()
                 }
                 tried = true;
                 CAddress addr(CService(), NODE_NONE);
-                OpenNetworkConnection(addr, false, &grant, info.strAddedNode.c_str(), false, false, ConnectionType::MANUAL);
+                OpenNetworkConnection(addr, false, &grant, info.strAddedNode.c_str(), false, ConnectionType::MANUAL);
                 if (!interruptNet.sleep_for(std::chrono::milliseconds(500)))
                     return;
             }
@@ -1964,7 +1965,7 @@ void CConnman::ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler, ConnectionType conn_type, bool block_relay_only)
+void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, ConnectionType conn_type, bool block_relay_only)
 {
     //
     // Initiate outbound network connection
@@ -1991,8 +1992,6 @@ void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
         grantOutbound->MoveTo(pnode->grantOutbound);
     if (fOneShot)
         pnode->fOneShot = true;
-    if (fFeeler)
-        pnode->fFeeler = true;
 
     m_msgproc->InitializeNode(pnode);
     {
@@ -2675,6 +2674,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     addr(addrIn),
     addrBind(addrBindIn),
     m_manual_connection(conn_type == ConnectionType::MANUAL),
+    fFeeler(conn_type == ConnectionType::FEELER),
     fInbound(conn_type == ConnectionType::INBOUND),
     nKeyedNetGroup(nKeyedNetGroupIn),
     // Don't relay addr messages to peers that we connect to as block-relay-only
