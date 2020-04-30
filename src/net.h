@@ -769,6 +769,7 @@ public:
     }
     // This boolean is unusued in actual processing, only present for backward compatibility at RPC/QT level
     bool m_legacyWhitelisted{false};
+    ConnectionType conn_type{ConnectionType::OUTBOUND};
     bool fFeeler{false}; // If true this node is being used as a short lived feeler.
     bool fOneShot{false};
     bool m_manual_connection{false};

@@ -1599,7 +1599,7 @@ void CConnman::ThreadDNSAddressSeed()
             LOCK(cs_vNodes);
             int nRelevant = 0;
             for (const CNode* pnode : vNodes) {
-                nRelevant += pnode->fSuccessfullyConnected && !pnode->fFeeler && !pnode->fOneShot && !pnode->m_manual_connection && !pnode->fInbound;
+                nRelevant += pnode->fSuccessfullyConnected && pnode->conn_type == ConnectionType::OUTBOUND;
             }
             if (nRelevant >= 2) {
                 LogPrintf("P2P peers available. Skipped DNS seeding.\n");
@@ -1695,7 +1695,7 @@ int CConnman::GetExtraOutboundCount()
     {
         LOCK(cs_vNodes);
         for (const CNode* pnode : vNodes) {
-            if (!pnode->fInbound && !pnode->m_manual_connection && !pnode->fFeeler && !pnode->fDisconnect && !pnode->fOneShot && pnode->fSuccessfullyConnected) {
+            if (pnode -> fSuccessfullyConnected && (pnode->conn_type == ConnectionType::OUTBOUND || pnode->conn_type == ConnectionType::BLOCK_RELAY) && !pnode->fDisconnect) {
                 ++nOutbound;
             }
         }
@@ -2674,10 +2674,11 @@ int CConnman::GetBestHeight() const
 
 unsigned int CConnman::GetReceiveFloodSize() const { return nReceiveFloodSize; }
 
-CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress& addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress& addrBindIn, const std::string& addrNameIn, ConnectionType conn_type)
+CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress& addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress& addrBindIn, const std::string& addrNameIn, ConnectionType connection_type)
     : nTimeConnected(GetSystemTimeInSeconds()),
     addr(addrIn),
     addrBind(addrBindIn),
+    conn_type(connection_type),
     m_manual_connection(conn_type == ConnectionType::MANUAL),
     fFeeler(conn_type == ConnectionType::FEELER),
     fOneShot(conn_type == ConnectionType::SCOUT),
@@ -2686,7 +2687,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     // Don't relay addr messages to peers that we connect to as block-relay-only
     // peers (to prevent adversaries from inferring these links from addr
     // traffic).
-    m_addr_known{conn_type == ConnectionType::BLOCK_RELAY ? nullptr : MakeUnique<CRollingBloomFilter>(5000, 0.001)},
+    m_addr_known{connection_type == ConnectionType::BLOCK_RELAY ? nullptr : MakeUnique<CRollingBloomFilter>(5000, 0.001)},
     id(idIn),
     nLocalHostNonce(nLocalHostNonceIn),
     nLocalServices(nLocalServicesIn),
@@ -2695,7 +2696,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     hSocket = hSocketIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     hashContinue = uint256();
-    if (conn_type != ConnectionType::BLOCK_RELAY) {
+    if (connection_type != ConnectionType::BLOCK_RELAY) {
         m_tx_relay = MakeUnique<TxRelay>();
     }
 
