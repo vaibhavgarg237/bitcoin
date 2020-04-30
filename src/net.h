@@ -346,8 +346,8 @@ private:
     bool Bind(const CService& addr, unsigned int flags, NetPermissionFlags permissions);
     bool InitBinds(const std::vector<CService>& binds, const std::vector<NetWhitebindPermissions>& whiteBinds);
     void ThreadOpenAddedConnections();
-    void AddOneShot(const std::string& strDest);
-    void ProcessOneShot();
+    void AddOneShot(const std::string& strDest); // TODO: add docs here to explain
+    void ProcessOneShot(); // TODO: add docs here to explain
     void ThreadOpenConnections(std::vector<std::string> connect);
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket& hListenSocket);
@@ -772,7 +772,6 @@ public:
     ConnectionType conn_type{ConnectionType::OUTBOUND};
     bool fFeeler{false}; // If true this node is being used as a short lived feeler.
     bool fOneShot{false};
-    bool m_manual_connection{false};
     bool fClient{false}; // set by version message
     bool m_limited_node{false}; //after BIP159, set by version message
     const bool fInbound;

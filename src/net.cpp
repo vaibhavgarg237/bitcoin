@@ -522,7 +522,7 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
         X(cleanSubVer);
     }
     X(fInbound);
-    X(m_manual_connection);
+    stats.m_manual_connection = (conn_type == ConnectionType::MANUAL);
     X(nStartingHeight);
     {
         LOCK(cs_vSend);
@@ -1766,7 +1766,8 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
         {
             LOCK(cs_vNodes);
             for (const CNode* pnode : vNodes) {
-                if (!pnode->fInbound && !pnode->m_manual_connection) {
+                // todo: check this out
+                if (!pnode->fInbound && (pnode->conn_type != ConnectionType::MANUAL)) {
                     // Netgroups for inbound and addnode peers are not excluded because our goal here
                     // is to not use multiple of our limited outbound slots on a single netgroup
                     // but inbound and addnode peers do not use our outbound slots.  Inbound peers
@@ -2679,7 +2680,6 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     addr(addrIn),
     addrBind(addrBindIn),
     conn_type(connection_type),
-    m_manual_connection(conn_type == ConnectionType::MANUAL),
     fFeeler(conn_type == ConnectionType::FEELER),
     fOneShot(conn_type == ConnectionType::SCOUT),
     fInbound(conn_type == ConnectionType::INBOUND),
