@@ -258,6 +258,8 @@ static UniValue addnode(const JSONRPCRequest& request)
 
     std::string strNode = request.params[0].get_str();
 
+    // Attempts to open a manual connection to the peer.
+    // Does not reattempt if unsuccesful.
     if (strCommand == "onetry")
     {
         CAddress addr;
@@ -265,11 +267,15 @@ static UniValue addnode(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
+    // Adds node to list of manual peers & periodically attempts to open a connection.
     if (strCommand == "add")
     {
         if(!node.connman->AddNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
     }
+
+    // Removes node from list of manual peers. Does not trigger a disconnect,
+    // but will not automatically attempt reconnecting in the future.
     else if(strCommand == "remove")
     {
         if(!node.connman->RemoveAddedNode(strNode))
