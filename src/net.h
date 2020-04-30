@@ -116,6 +116,7 @@ enum class ConnectionType {
     MANUAL,
     FEELER,
     BLOCK_RELAY,
+    SCOUT,
 };
 
 class NetEventsInterface;
@@ -201,7 +202,7 @@ public:
     bool GetNetworkActive() const { return fNetworkActive; };
     bool GetUseAddrmanOutgoing() const { return m_use_addrman_outgoing; };
     void SetNetworkActive(bool active);
-    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, bool fOneShot = false, ConnectionType conn_type = ConnectionType::OUTBOUND);
+    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, ConnectionType conn_type = ConnectionType::OUTBOUND);
     bool CheckIncomingNonce(uint64_t nonce);
 
     bool ForNode(NodeId id, std::function<bool(CNode* pnode)> func);
