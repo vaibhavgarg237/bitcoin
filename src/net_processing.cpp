@@ -2248,7 +2248,7 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
 
     // Feature negotiation of wtxidrelay should happen between VERSION and
     // VERACK, to avoid relay problems from switching after a connection is up
-    if (strCommand == NetMsgType::WTXIDRELAY) {
+    if (msg_type == NetMsgType::WTXIDRELAY) {
         if (pfrom->nVersion >= WTXID_RELAY_VERSION) {
             LOCK(cs_main);
             if (!State(pfrom->GetId())->m_wtxid_relay) {
