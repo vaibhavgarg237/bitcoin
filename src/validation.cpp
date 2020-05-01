@@ -5060,12 +5060,12 @@ bool LoadMempool(CTxMemPool& pool)
             pool.PrioritiseTransaction(i.first, i.second);
         }
 
-        std::set<uint256> unbroadcast_txids;
+        std::map<uint256, uint256> unbroadcast_txids;
         file >> unbroadcast_txids;
         unbroadcast = unbroadcast_txids.size();
 
-        for (const auto& txid : unbroadcast_txids) {
-            pool.AddUnbroadcastTx(txid);
+        for (const std::pair<uint256, uint256> elem : unbroadcast_txids) {
+            pool.AddUnbroadcastTx(elem.first, elem.second);
         }
 
     } catch (const std::exception& e) {
@@ -5083,7 +5083,7 @@ bool DumpMempool(const CTxMemPool& pool)
 
     std::map<uint256, CAmount> mapDeltas;
     std::vector<TxMempoolInfo> vinfo;
-    std::set<uint256> unbroadcast_txids;
+    std::map<uint256, uint256> unbroadcast_txids;
 
     static Mutex dump_mutex;
     LOCK(dump_mutex);

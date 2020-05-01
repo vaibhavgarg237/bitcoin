@@ -824,10 +824,13 @@ void PeerLogicValidation::InitializeNode(CNode *pnode) {
 
 void PeerLogicValidation::ReattemptInitialBroadcast(CScheduler& scheduler) const
 {
-    std::set<uint256> unbroadcast_txids = m_mempool.GetUnbroadcastTxs();
+    std::map<uint256, uint256> unbroadcast_txids = m_mempool.GetUnbroadcastTxs();
 
-    for (const uint256& txid : unbroadcast_txids) {
-        RelayTransaction(txid, *connman);
+    {
+        LOCK(cs_main);
+        for(const std::pair<uint256, uint256> elem : unbroadcast_txids) {
+            RelayTransaction(elem.first, elem.second, *connman);
+        }
     }
 
     // schedule next run for 10-15 minutes in the future
