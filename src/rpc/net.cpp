@@ -230,7 +230,7 @@ static UniValue addnode(const JSONRPCRequest& request)
     if (!request.params[1].isNull())
         strCommand = request.params[1].get_str();
     if (request.fHelp || request.params.size() != 2 ||
-        (strCommand != "onetry" && strCommand != "add" && strCommand != "remove"))
+        (strCommand != "onetry" && strCommand != "add" && strCommand != "remove" && strCommand != "onetry-auto" && strCommand != "onetry-blockrelay"))
         throw std::runtime_error(
             RPCHelpMan{"addnode",
                 "\nAttempts to add or remove a node from the addnode list.\n"
@@ -265,6 +265,14 @@ static UniValue addnode(const JSONRPCRequest& request)
         if (!g_rpc_node->connman->RemoveAddedNode(strNode)) {
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         }
+    } else if (strCommand == "onetry-auto") {
+        CAddress addr;
+        g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::OUTBOUND);
+        return NullUniValue;
+    } else if (strCommand == "onetry-blockrelay") {
+        CAddress addr;
+        g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::BLOCK_RELAY);
+        return NullUniValue;
     }
 
     return NullUniValue;
