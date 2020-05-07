@@ -256,7 +256,6 @@ static UniValue addnode(const JSONRPCRequest& request)
     if (strCommand == "onetry") {
         CAddress addr;
         g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::MANUAL);
-        return NullUniValue;
     } else if (strCommand == "add") {
         if (!g_rpc_node->connman->AddNode(strNode)) {
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
@@ -268,11 +267,9 @@ static UniValue addnode(const JSONRPCRequest& request)
     } else if (strCommand == "onetry-auto") {
         CAddress addr;
         g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::OUTBOUND);
-        return NullUniValue;
     } else if (strCommand == "onetry-blockrelay") {
         CAddress addr;
         g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::BLOCK_RELAY);
-        return NullUniValue;
     }
 
     return NullUniValue;
