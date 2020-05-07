@@ -355,6 +355,8 @@ static CAddress GetBindAddress(SOCKET sock)
 
 CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure, ConnectionType conn_type)
 {
+    assert(conn_type != ConnectionType::INBOUND);
+
     if (pszDest == nullptr) {
         if (IsLocal(addrConnect))
             return nullptr;
@@ -1975,6 +1977,8 @@ void CConnman::ThreadOpenAddedConnections()
 // if successful, this moves the passed grant to the constructed node
 void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, ConnectionType conn_type)
 {
+    assert(conn_type != ConnectionType::INBOUND);
+
     //
     // Initiate outbound network connection
     //
