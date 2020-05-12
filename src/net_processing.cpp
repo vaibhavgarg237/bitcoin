@@ -2380,7 +2380,7 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
         }
 
         // Feeler connections exist only to verify if address is online.
-        if (pfrom->fFeeler) {
+        if (pfrom->m_conn_type == ConnectionType::FEELER) {
             assert(pfrom->fInbound == false);
             pfrom->fDisconnect = true;
         }
