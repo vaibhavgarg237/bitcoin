@@ -1768,19 +1768,20 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
         {
             LOCK(cs_vNodes);
             for (const CNode* pnode : vNodes) {
-                // todo: check this out
-                if (!pnode->fInbound && (pnode->conn_type != ConnectionType::MANUAL)) {
-                    // Netgroups for inbound and addnode peers are not excluded because our goal here
-                    // is to not use multiple of our limited outbound slots on a single netgroup
-                    // but inbound and addnode peers do not use our outbound slots.  Inbound peers
-                    // also have the added issue that they're attacker controlled and could be used
-                    // to prevent us from connecting to particular hosts if we used them here.
-                    setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
-                    if (pnode->m_tx_relay == nullptr) {
-                        nOutboundBlockRelay++;
-                    } else if (!(pnode->conn_type == ConnectionType::FEELER)) {
-                        nOutboundFullRelay++;
-                    }
+                // Netgroups for inbound and addnode peers are not excluded because our goal here
+                // is to not use multiple of our limited outbound slots on a single netgroup
+                // but inbound and addnode peers do not use our outbound slots.  Inbound peers
+                // also have the added issue that they're attacker controlled and could be used
+                // to prevent us from connecting to particular hosts if we used them here.
+                if (pnode->conn_type == ConnectionType::INBOUND) continue;
+                if (pnode->conn_type == ConnectionType::MANUAL) continue;
+
+                setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
+                if (pnode->conn_type == ConnectionType::BLOCK_RELAY) {
+                    nOutboundBlockRelay++;
+                } else if (pnode->conn_type != ConnectionType::FEELER) {
+                    // Q: won't scout/oneshot connections be counted as outbound full relay here?
+                    nOutboundFullRelay++;
                 }
             }
         }
