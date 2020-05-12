@@ -90,10 +90,10 @@ std::map<CNetAddr, LocalServiceInfo> mapLocalHost GUARDED_BY(cs_mapLocalHost);
 static bool vfLimited[NET_MAX] GUARDED_BY(cs_mapLocalHost) = {};
 std::string strSubVersion;
 
-void CConnman::AddOneShot(const std::string& strDest)
+void CConnman::AddScout(const std::string& strDest)
 {
-    LOCK(cs_vOneShots);
-    vOneShots.push_back(strDest);
+    LOCK(cs_vScouts);
+    vScouts.push_back(strDest);
 }
 
 unsigned short GetListenPort()
@@ -1615,7 +1615,7 @@ void CConnman::ThreadDNSAddressSeed()
         }
         LogPrintf("Loading addresses from DNS seed %s\n", seed);
         if (HaveNameProxy()) {
-            AddOneShot(seed);
+            AddScout(seed);
         } else {
             std::vector<CNetAddr> vIPs;
             std::vector<CAddress> vAdd;
@@ -1637,8 +1637,8 @@ void CConnman::ThreadDNSAddressSeed()
                 addrman.Add(vAdd, resolveSource);
             } else {
                 // We now avoid directly using results from DNS Seeds which do not support service bit filtering,
-                // instead using them as a oneshot to get nodes with our desired service bits.
-                AddOneShot(seed);
+                // instead using them as a scout to get nodes with our desired service bits.
+                AddScout(seed);
             }
         }
         --seeds_right_now;
@@ -1657,15 +1657,15 @@ void CConnman::DumpAddresses()
            addrman.size(), GetTimeMillis() - nStart);
 }
 
-void CConnman::ProcessOneShot()
+void CConnman::ProcessScout()
 {
     std::string strDest;
     {
-        LOCK(cs_vOneShots);
-        if (vOneShots.empty())
+        LOCK(cs_vScouts);
+        if (vScouts.empty())
             return;
-        strDest = vOneShots.front();
-        vOneShots.pop_front();
+        strDest = vScouts.front();
+        vScouts.pop_front();
     }
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
@@ -1712,7 +1712,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
     {
         for (int64_t nLoop = 0;; nLoop++)
         {
-            ProcessOneShot();
+            ProcessScout();
             for (const std::string& strAddr : connect)
             {
                 CAddress addr(CService(), NODE_NONE);
@@ -1735,7 +1735,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
     int64_t nNextFeeler = PoissonNextSend(nStart*1000*1000, FEELER_INTERVAL);
     while (!interruptNet)
     {
-        ProcessOneShot();
+        ProcessScout();
 
         if (!interruptNet.sleep_for(std::chrono::milliseconds(500)))
             return;
@@ -2263,7 +2263,7 @@ bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
     }
 
     for (const auto& strDest : connOptions.vSeedNodes) {
-        AddOneShot(strDest);
+        AddScout(strDest);
     }
 
     if (clientInterface) {
@@ -2685,7 +2685,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     addrBind(addrBindIn),
     conn_type(connection_type),
     fFeeler(conn_type == ConnectionType::FEELER),
-    fOneShot(conn_type == ConnectionType::SCOUT),
+    fScout(conn_type == ConnectionType::SCOUT),
     fInbound(conn_type == ConnectionType::INBOUND),
     nKeyedNetGroup(nKeyedNetGroupIn),
     // Don't relay addr messages to peers that we connect to as block-relay-only

@@ -346,8 +346,8 @@ private:
     bool Bind(const CService& addr, unsigned int flags, NetPermissionFlags permissions);
     bool InitBinds(const std::vector<CService>& binds, const std::vector<NetWhitebindPermissions>& whiteBinds);
     void ThreadOpenAddedConnections();
-    void AddOneShot(const std::string& strDest); // TODO: add docs here to explain
-    void ProcessOneShot(); // TODO: add docs here to explain
+    void AddScout(const std::string& strDest); // TODO: add docs here to explain
+    void ProcessScout(); // TODO: add docs here to explain
     void ThreadOpenConnections(std::vector<std::string> connect);
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket& hListenSocket);
@@ -411,8 +411,8 @@ private:
     std::atomic<bool> fNetworkActive{true};
     bool fAddressesInitialized{false};
     CAddrMan addrman;
-    std::deque<std::string> vOneShots GUARDED_BY(cs_vOneShots);
-    RecursiveMutex cs_vOneShots;
+    std::deque<std::string> vScouts GUARDED_BY(cs_vScouts);
+    RecursiveMutex cs_vScouts;
     std::vector<std::string> vAddedNodes GUARDED_BY(cs_vAddedNodes);
     RecursiveMutex cs_vAddedNodes;
     std::vector<CNode*> vNodes GUARDED_BY(cs_vNodes);
@@ -771,7 +771,7 @@ public:
     bool m_legacyWhitelisted{false};
     ConnectionType conn_type{ConnectionType::OUTBOUND};
     bool fFeeler{false}; // If true this node is being used as a short lived feeler.
-    bool fOneShot{false};
+    bool fScout{false};
     bool fClient{false}; // set by version message
     bool m_limited_node{false}; //after BIP159, set by version message
     const bool fInbound;
