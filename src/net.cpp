@@ -1778,7 +1778,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
                     setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
                     if (pnode->m_tx_relay == nullptr) {
                         nOutboundBlockRelay++;
-                    } else if (!pnode->fFeeler) {
+                    } else if (!(pnode->conn_type == ConnectionType::FEELER)) {
                         nOutboundFullRelay++;
                     }
                 }
@@ -2684,7 +2684,6 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     addr(addrIn),
     addrBind(addrBindIn),
     conn_type(connection_type),
-    fFeeler(conn_type == ConnectionType::FEELER),
     fScout(conn_type == ConnectionType::SCOUT),
     fInbound(conn_type == ConnectionType::INBOUND),
     nKeyedNetGroup(nKeyedNetGroupIn),
