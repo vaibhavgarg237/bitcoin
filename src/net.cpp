@@ -1779,8 +1779,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
                 setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
                 if (pnode->conn_type == ConnectionType::BLOCK_RELAY) {
                     nOutboundBlockRelay++;
-                } else if (pnode->conn_type != ConnectionType::FEELER) {
-                    // Q: won't scout/oneshot connections be counted as outbound full relay here?
+                } else if (pnode->conn_type == ConnectionType::OUTBOUND) {
                     nOutboundFullRelay++;
                 }
             }
