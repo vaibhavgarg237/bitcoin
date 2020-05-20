@@ -1876,10 +1876,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
 
             // Open this connection as block-relay-only if we're already at our
             // full-relay capacity, but not yet at our block-relay peer limit.
-            // (It should not be possible for fFeeler to be set if we're not
-            // also at our block-relay peer limit, but check against that as
-            // well for sanity.)
-            bool block_relay_only = nOutboundBlockRelay < m_max_outbound_block_relay && !fFeeler && nOutboundFullRelay >= m_max_outbound_full_relay;
+            bool block_relay_only = nOutboundBlockRelay < m_max_outbound_block_relay && nOutboundFullRelay >= m_max_outbound_full_relay;
             ConnectionType conn_type;
             if(fFeeler) {
                 conn_type = ConnectionType::FEELER;
