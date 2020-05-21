@@ -5,6 +5,7 @@
 #include <rpc/server.h>
 
 #include <banman.h>
+#include <chainparams.h>
 #include <clientversion.h>
 #include <core_io.h>
 #include <net.h>
@@ -272,6 +273,35 @@ static UniValue addnode(const JSONRPCRequest& request)
         CAddress addr;
         g_rpc_node->connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::BLOCK_RELAY);
     }
+
+    return NullUniValue;
+}
+
+static UniValue addconnection(const JSONRPCRequest& request)
+{
+    const RPCHelpMan help{"addconnection",
+        "\nTODO:description (test only)",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The node (see getpeerinfo for nodes)"}
+        },
+        RPCResult{RPCResult::Type::NONE, "", ""},
+        RPCExamples{
+            HelpExampleCli("addconnection", "\"192.168.0.6:8333\" \"auto\"")
+            + HelpExampleRpc("addconnection", "\"192.168.0.6:8333\" \"auto\"")
+        },
+    };
+
+    help.Check(request);
+
+    if (!Params().IsMockableChain()) {
+        throw std::runtime_error("addconnection is for regression testing (-regtest mode) only");
+    }
+
+    RPCTypeCheckArgument(request.params, UniValue::VSTR);
+
+    const std::string address_in = request.params[0].get_str();
+
+    g_rpc_node->connman->AddConnection(address_in);
 
     return NullUniValue;
 }
@@ -772,6 +802,7 @@ static const CRPCCommand commands[] =
     { "network",            "ping",                   &ping,                   {} },
     { "network",            "getpeerinfo",            &getpeerinfo,            {} },
     { "network",            "addnode",                &addnode,                {"node","command"} },
+    { "hidden",             "addconnection",          &addconnection,          {"node", "command"} },
     { "network",            "disconnectnode",         &disconnectnode,         {"address", "nodeid"} },
     { "network",            "getaddednodeinfo",       &getaddednodeinfo,       {"node"} },
     { "network",            "getnettotals",           &getnettotals,           {} },
