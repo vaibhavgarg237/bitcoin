@@ -275,7 +275,7 @@ public:
     bool RemoveAddedNode(const std::string& node);
     std::vector<AddedNodeInfo> GetAddedNodeInfo();
 
-    bool AddConnection(const std::string& address);
+    bool AddConnection(const std::string& address, const ConnectionType conn_type);
 
     size_t GetNodeCount(NumConnections num);
     void GetNodeStats(std::vector<CNodeStats>& vstats);

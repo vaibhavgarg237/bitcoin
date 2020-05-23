@@ -1046,13 +1046,17 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     RandAddEvent((uint32_t)id);
 }
 
-bool CConnman::AddConnection(const std::string& address)
+bool CConnman::AddConnection(const std::string& address, const ConnectionType conn_type)
 {
+    assert(conn_type == ConnectionType::OUTBOUND || conn_type == ConnectionType::BLOCK_RELAY);
+
+    // TODO: return false if block relay is too many
+
     CSemaphoreGrant grant(*semOutbound, true);
     if (!grant) return false;
 
     CAddress addr{};
-    OpenNetworkConnection(addr, false, nullptr, address.c_str(), ConnectionType::OUTBOUND);
+    OpenNetworkConnection(addr, false, nullptr, address.c_str(), conn_type);
     return true;
 }
 

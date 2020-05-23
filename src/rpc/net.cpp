@@ -282,7 +282,8 @@ static UniValue addconnection(const JSONRPCRequest& request)
     const RPCHelpMan help{"addconnection",
         "\nTODO:description (test only)",
         {
-            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The node (see getpeerinfo for nodes)"}
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The node (see getpeerinfo for nodes)"},
+            {"connectiontype", RPCArg::Type::STR, RPCArg::Optional::NO, "'auto' or 'blockrelay'"}
         },
         RPCResult{RPCResult::Type::NONE, "", ""},
         RPCExamples{
@@ -297,11 +298,20 @@ static UniValue addconnection(const JSONRPCRequest& request)
         throw std::runtime_error("addconnection is for regression testing (-regtest mode) only");
     }
 
-    RPCTypeCheckArgument(request.params, UniValue::VSTR);
+    RPCTypeCheck(request.params, { UniValue::VSTR, UniValue::VSTR });
 
     const std::string address_in = request.params[0].get_str();
+    const std::string conn_type_in = request.params[1].get_str();
+    if (conn_type_in != "auto" && conn_type_in != "blockrelay") {
+        throw std::runtime_error(help.ToString());
+    }
 
-    g_rpc_node->connman->AddConnection(address_in);
+    const ConnectionType conn_type = conn_type_in == "auto" ? ConnectionType::OUTBOUND : ConnectionType::BLOCK_RELAY;
+    bool success = g_rpc_node->connman->AddConnection(address_in, conn_type);
+
+    if (!success){
+        throw JSONRPCError(RPC_CLIENT_MAX_CONN_HIT,"Error: toooo many of that type of connection homie");
+    }
 
     return NullUniValue;
 }
