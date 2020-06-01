@@ -477,7 +477,13 @@ class TestNode():
                     assert_msg = "bitcoind should have exited with expected error " + expected_msg
                 self._raise_assertion_error(assert_msg)
 
-    def add_p2p_connection(self, p2p_conn, *, wait_for_verack=True, **kwargs):
+    # todo: update docstring
+    # q: whats the point of connect_id?
+    # can I update connection_type=None to Default?
+    # can I have connect_id default to 0 in function signature?
+    # q: should the `wait_for_connect()` be in the else?
+    # what does "cb" of connect_cb stand for?
+    def add_p2p_connection(self, p2p_conn, *, wait_for_verack=True, connection_type=None, connect_id=None, **kwargs):
         """Add a p2p connection to the node.
 
         This method adds the p2p connection to the self.p2ps list and also
@@ -487,8 +493,22 @@ class TestNode():
         if 'dstaddr' not in kwargs:
             kwargs['dstaddr'] = '127.0.0.1'
 
-        p2p_conn.peer_connect(**kwargs, net=self.chain)()
+        if connection_type is None:
+            # default connection type: p2p_conn connects to the node
+            p2p_conn.peer_connect(**kwargs, net=self.chain)()
+        else:
+            # open an outbound connection from node, full or block-relay-only
+            if connect_id is None: connect_id = 0
+            def cb(address, port):
+                self.log.debug("Connecting to %s:%d %s" % (address, port, connection_type))
+                self.addconnection('%s:%d' % (address, port), connection_type)
+
+            p2p_conn.peer_connect(connect_cb=cb, connect_id=connect_id, **kwargs)()
+
+        p2p_conn.wait_for_connect()
+
         self.p2ps.append(p2p_conn)
+
         if wait_for_verack:
             # Wait for the node to send us the version and verack
             p2p_conn.wait_for_verack()
