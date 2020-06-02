@@ -1053,13 +1053,30 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     RandAddEvent((uint32_t)id);
 }
 
-bool CConnman::AddConnection(const std::string& address)
+bool CConnman::AddConnection(const std::string& address, const ConnectionType conn_type)
 {
-    CSemaphoreGrant grant(*semOutbound, true);
-    if (!grant) return false;
+    if (conn_type == ConnectionType::OUTBOUND || conn_type == ConnectionType::BLOCK_RELAY) return false;
+
+    // check if we are at capacity based on connection type
+    CSemaphoreGrant* grant_ptr;
+    if (conn_type == ConnectionType::OUTBOUND) {
+        CSemaphoreGrant grant(*semOutbound, true);
+        if (!grant) return false;
+        grant_ptr = &grant;
+    } else { // block relay connection
+        grant_ptr = nullptr;
+
+        // count current block relay connections
+        int nOutboundBlockRelay = 0;
+        LOCK(cs_vNodes);
+        for (const CNode* pnode : vNodes) {
+            if (pnode->m_conn_type == ConnectionType::BLOCK_RELAY) ++nOutboundBlockRelay;
+        }
+        if (nOutboundBlockRelay >= m_max_outbound_block_relay) return false;
+    }
 
     CAddress addr{};
-    OpenNetworkConnection(addr, false, &grant, address.c_str(), ConnectionType::OUTBOUND);
+    OpenNetworkConnection(addr, false, grant_ptr, address.c_str(), conn_type);
     return true;
 }
 
