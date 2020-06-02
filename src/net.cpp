@@ -1053,6 +1053,16 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     RandAddEvent((uint32_t)id);
 }
 
+bool CConnman::AddConnection(const std::string& address)
+{
+    CSemaphoreGrant grant(*semOutbound, true);
+    if (!grant) return false;
+
+    CAddress addr{};
+    OpenNetworkConnection(addr, false, &grant, address.c_str(), ConnectionType::OUTBOUND);
+    return true;
+}
+
 void CConnman::DisconnectNodes()
 {
     {

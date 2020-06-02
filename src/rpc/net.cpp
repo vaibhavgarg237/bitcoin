@@ -5,6 +5,7 @@
 #include <rpc/server.h>
 
 #include <banman.h>
+#include <chainparams.h>
 #include <clientversion.h>
 #include <core_io.h>
 #include <net.h>
@@ -273,6 +274,38 @@ static UniValue addnode(const JSONRPCRequest& request)
     {
         if(!node.connman->RemoveAddedNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
+    }
+
+    return NullUniValue;
+}
+
+static UniValue addconnection(const JSONRPCRequest& request)
+{
+    const RPCHelpMan help{"addconnection",
+        "\nOpen an outbound connection to a specified node (test only)",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The IP address and port to attempt connecting to."},
+        },
+        RPCResult{RPCResult::Type::NONE, "", ""},
+        RPCExamples{
+            HelpExampleCli("addconnection", "\"192.168.0.6:8333\"")
+            + HelpExampleRpc("addconnection", "\"192.168.0.6:8333\"")
+        },
+    };
+
+    help.Check(request);
+
+    if (!Params().IsMockableChain()) {
+        throw std::runtime_error("addconnection is for regression testing (-regtest mode) only");
+    }
+
+    RPCTypeCheckArgument(request.params, UniValue::VSTR);
+    const std::string address_in = request.params[0].get_str();
+    NodeContext& node = EnsureNodeContext(request.context);
+    bool success = node.connman->AddConnection(address_in);
+
+    if(!success) {
+        throw JSONRPCError(RPC_CLIENT_NODE_CAPACITY_REACHED, "Error: Max number of outbound full relay connections already open.");
     }
 
     return NullUniValue;
@@ -792,6 +825,9 @@ static const CRPCCommand commands[] =
     { "network",            "clearbanned",            &clearbanned,            {} },
     { "network",            "setnetworkactive",       &setnetworkactive,       {"state"} },
     { "network",            "getnodeaddresses",       &getnodeaddresses,       {"count"} },
+
+    /* Not shown in help */
+    { "hidden",             "addconnection",          &addconnection,          {"address"} },
 };
 // clang-format on
 
