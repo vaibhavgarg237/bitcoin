@@ -135,6 +135,7 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                                                               "When a message type is not listed in this json object, the bytes received are 0.\n"
                                                               "Only known message types can appear as keys in the object and all bytes received of unknown message types are listed under '"+NET_MESSAGE_COMMAND_OTHER+"'."}
                             }},
+                            {RPCResult::Type::STR, "connection_type", "Type of connection: \n" + Join(CONNECTION_TYPE_DOC, ",\n") + "."},
                         }},
                     }},
                 },
@@ -228,6 +229,7 @@ static UniValue getpeerinfo(const JSONRPCRequest& request)
                 recvPerMsgCmd.pushKV(i.first, i.second);
         }
         obj.pushKV("bytesrecv_per_msg", recvPerMsgCmd);
+        obj.pushKV("connection_type", stats.m_conn_type_string);
 
         ret.push_back(obj);
     }
