@@ -838,26 +838,56 @@ public:
         assert(false);
     }
 
+    /* These are the default connections that we use to connect with the
+     * network. There is no restriction on the inventory relayed- by default we
+     * relay blocks, addresses & transactions. We attempt to open
+     * MAX_OUTBOUND_FULL_RELAY_CONNECTIONS using addresses from our AddrMan.
+     */
     bool IsFullOutboundConn() const {
         return m_conn_type == ConnectionType::OUTBOUND_FULL_RELAY;
     }
 
+    /* We open manual connections to addresses that users explicitly inputted
+     * via the addnode RPC, or the -connect command line argument. Even if a
+     * manual connection is misbehaving, we do not automatically disconnect or
+     * add it to our discouragement filter.
+     */
     bool IsManualConn() const {
         return m_conn_type == ConnectionType::MANUAL;
     }
 
+    /* After meeting our quota for full outbound connections, we attempt to
+     * open MAX_BLOCK_RELAY_ONLY_CONNECTIONS to help prevent against partition
+     * attacks. By not relaying transactions or addresses, these connections
+     * are harder to detect by a third party, thus helping obfuscate the
+     * network topology.
+     */
     bool IsBlockOnlyConn() const {
         return m_conn_type == ConnectionType::BLOCK_RELAY;
     }
 
+    /* Feeler connections are short lived connections used to increase the
+     * number of connectable addresses in our AddrMan. Approximately every
+     * FEELER_INTERVAL, we attempt to connect to a random address from the new
+     * table. If successful, we add it to the tried table.
+     */
     bool IsFeelerConn() const {
         return m_conn_type == ConnectionType::FEELER;
     }
 
+    /* AddrFetch connections are short lived connections used to solicit
+     * addresses from peers. These are initiated to addresses submitted via the
+     * -seednode command line argument, or under certain conditions when the
+     * AddrMan is empty.
+     */
     bool IsAddrFetchConn() const {
         return m_conn_type == ConnectionType::ADDR_FETCH;
     }
 
+    /* Inbound connections are those initiated by a peer. This is the only
+     * property we know at the time of connection, until P2P messages are
+     * exchanged.
+     */
     bool IsInboundConn() const {
         return m_conn_type == ConnectionType::INBOUND;
     }
