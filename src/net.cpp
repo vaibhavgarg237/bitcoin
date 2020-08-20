@@ -1766,6 +1766,162 @@ int CConnman::GetExtraOutboundCount()
     return std::max(nOutbound - m_max_outbound_full_relay - m_max_outbound_block_relay, 0);
 }
 
+void CConnman::AttemptToOpenConnection(int64_t nStart, int64_t nNextFeeler)
+{
+    ProcessAddrFetch();
+
+    if (!interruptNet.sleep_for(std::chrono::milliseconds(500)))
+        return;
+
+    CSemaphoreGrant grant(*semOutbound);
+    if (interruptNet)
+        return;
+
+    // Add seed nodes if DNS seeds are all down (an infrastructure attack?).
+    // Note that we only do this if we started with an empty peers.dat,
+    // (in which case we will query DNS seeds immediately) *and* the DNS
+    // seeds have not returned any results.
+    if (addrman.size() == 0 && (GetTime() - nStart > 60)) {
+        static bool done = false;
+        if (!done) {
+            LogPrintf("Adding fixed seed nodes as DNS doesn't seem to be available.\n");
+            CNetAddr local;
+            local.SetInternal("fixedseeds");
+            addrman.Add(convertSeed6(Params().FixedSeeds()), local);
+            done = true;
+        }
+    }
+
+    //
+    // Choose an address to connect to based on most recently seen
+    //
+    CAddress addrConnect;
+
+    // Only connect out to one peer per network group (/16 for IPv4).
+    int nOutboundFullRelay = 0;
+    int nOutboundBlockRelay = 0;
+    std::set<std::vector<unsigned char> > setConnected;
+
+    {
+        LOCK(cs_vNodes);
+        for (const CNode* pnode : vNodes) {
+            if (pnode->IsFullOutboundConn()) nOutboundFullRelay++;
+            if (pnode->IsBlockOnlyConn()) nOutboundBlockRelay++;
+
+            // Netgroups for inbound and manual peers are not excluded because our goal here
+            // is to not use multiple of our limited outbound slots on a single netgroup
+            // but inbound and manual peers do not use our outbound slots. Inbound peers
+            // also have the added issue that they could be attacker controlled and used
+            // to prevent us from connecting to particular hosts if we used them here.
+            switch (pnode->m_conn_type) {
+                case ConnectionType::INBOUND:
+                case ConnectionType::MANUAL:
+                    break;
+                case ConnectionType::OUTBOUND_FULL_RELAY:
+                case ConnectionType::BLOCK_RELAY:
+                case ConnectionType::ADDR_FETCH:
+                case ConnectionType::FEELER:
+                    setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
+            }
+        }
+    }
+
+    ConnectionType conn_type = ConnectionType::OUTBOUND_FULL_RELAY;
+    int64_t nTime = GetTimeMicros();
+    bool fFeeler = false;
+
+    // Determine what type of connection to open. Opening
+    // OUTBOUND_FULL_RELAY connections gets the highest priority until we
+    // meet our full-relay capacity. Then we open BLOCK_RELAY connection
+    // until we hit our block-relay peer limit. GetTryNewOutboundPeer()
+    // gets set when a stale tip is detected, so we try opening an
+    // additional OUTBOUND_FULL_RELAY connection. If none of these
+    // conditions are met, check the nNextFeeler timer to decide if we
+    // should open a feeler.
+
+    if (nOutboundFullRelay < m_max_outbound_full_relay) {
+        // OUTBOUND_FULL_RELAY
+    } else if (nOutboundBlockRelay < m_max_outbound_block_relay) {
+        conn_type = ConnectionType::BLOCK_RELAY;
+    } else if (GetTryNewOutboundPeer()) {
+        // OUTBOUND_FULL_RELAY
+    } else if (nTime > nNextFeeler) {
+        nNextFeeler = PoissonNextSend(nTime, FEELER_INTERVAL);
+        conn_type = ConnectionType::FEELER;
+        fFeeler = true;
+    } else {
+        // end of this connection attempt
+        return;
+    }
+
+    addrman.ResolveCollisions();
+
+    int64_t nANow = GetAdjustedTime();
+    int nTries = 0;
+    while (!interruptNet)
+    {
+        CAddrInfo addr = addrman.SelectTriedCollision();
+
+        // SelectTriedCollision returns an invalid address if it is empty.
+        if (!fFeeler || !addr.IsValid()) {
+            addr = addrman.Select(fFeeler);
+        }
+
+        // Require outbound connections, other than feelers, to be to distinct network groups
+        if (!fFeeler && setConnected.count(addr.GetGroup(addrman.m_asmap))) {
+            break;
+        }
+
+        // if we selected an invalid or local address, restart
+        if (!addr.IsValid() || IsLocal(addr)) {
+            break;
+        }
+
+        // If we didn't find an appropriate destination after trying 100 addresses fetched from addrman,
+        // stop this loop, and let the outer loop run again (which sleeps, adds seed nodes, recalculates
+        // already-connected network ranges, ...) before trying new addrman addresses.
+        nTries++;
+        if (nTries > 100)
+            break;
+
+        if (!IsReachable(addr))
+            continue;
+
+        // only consider very recently tried nodes after 30 failed attempts
+        if (nANow - addr.nLastTry < 600 && nTries < 30)
+            continue;
+
+        // for non-feelers, require all the services we'll want,
+        // for feelers, only require they be a full node (only because most
+        // SPV clients don't have a good address DB available)
+        if (!fFeeler && !HasAllDesirableServiceFlags(addr.nServices)) {
+            continue;
+        } else if (fFeeler && !MayHaveUsefulAddressDB(addr.nServices)) {
+            continue;
+        }
+
+        // do not allow non-default ports, unless after 50 invalid addresses selected already
+        if (addr.GetPort() != Params().GetDefaultPort() && nTries < 50)
+            continue;
+
+        addrConnect = addr;
+        break;
+    }
+
+    if (addrConnect.IsValid()) {
+
+        if (fFeeler) {
+            // Add small amount of random noise before connection to avoid synchronization.
+            int randsleep = GetRandInt(FEELER_SLEEP_WINDOW * 1000);
+            if (!interruptNet.sleep_for(std::chrono::milliseconds(randsleep)))
+                return;
+            LogPrint(BCLog::NET, "Making feeler connection to %s\n", addrConnect.ToString());
+        }
+
+        OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant, nullptr, conn_type);
+    }
+}
+
 void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
 {
     // Connect to specific addresses
@@ -1794,162 +1950,13 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
 
     // Minimum time before next feeler connection (in microseconds).
     int64_t nNextFeeler = PoissonNextSend(nStart*1000*1000, FEELER_INTERVAL);
-    while (!interruptNet)
-    {
-        ProcessAddrFetch();
 
-        if (!interruptNet.sleep_for(std::chrono::milliseconds(500)))
-            return;
-
-        CSemaphoreGrant grant(*semOutbound);
-        if (interruptNet)
-            return;
-
-        // Add seed nodes if DNS seeds are all down (an infrastructure attack?).
-        // Note that we only do this if we started with an empty peers.dat,
-        // (in which case we will query DNS seeds immediately) *and* the DNS
-        // seeds have not returned any results.
-        if (addrman.size() == 0 && (GetTime() - nStart > 60)) {
-            static bool done = false;
-            if (!done) {
-                LogPrintf("Adding fixed seed nodes as DNS doesn't seem to be available.\n");
-                CNetAddr local;
-                local.SetInternal("fixedseeds");
-                addrman.Add(convertSeed6(Params().FixedSeeds()), local);
-                done = true;
-            }
-        }
-
-        //
-        // Choose an address to connect to based on most recently seen
-        //
-        CAddress addrConnect;
-
-        // Only connect out to one peer per network group (/16 for IPv4).
-        int nOutboundFullRelay = 0;
-        int nOutboundBlockRelay = 0;
-        std::set<std::vector<unsigned char> > setConnected;
-
-        {
-            LOCK(cs_vNodes);
-            for (const CNode* pnode : vNodes) {
-                if (pnode->IsFullOutboundConn()) nOutboundFullRelay++;
-                if (pnode->IsBlockOnlyConn()) nOutboundBlockRelay++;
-
-                // Netgroups for inbound and manual peers are not excluded because our goal here
-                // is to not use multiple of our limited outbound slots on a single netgroup
-                // but inbound and manual peers do not use our outbound slots. Inbound peers
-                // also have the added issue that they could be attacker controlled and used
-                // to prevent us from connecting to particular hosts if we used them here.
-                switch (pnode->m_conn_type) {
-                    case ConnectionType::INBOUND:
-                    case ConnectionType::MANUAL:
-                        break;
-                    case ConnectionType::OUTBOUND_FULL_RELAY:
-                    case ConnectionType::BLOCK_RELAY:
-                    case ConnectionType::ADDR_FETCH:
-                    case ConnectionType::FEELER:
-                        setConnected.insert(pnode->addr.GetGroup(addrman.m_asmap));
-                }
-            }
-        }
-
-        ConnectionType conn_type = ConnectionType::OUTBOUND_FULL_RELAY;
-        int64_t nTime = GetTimeMicros();
-        bool fFeeler = false;
-
-        // Determine what type of connection to open. Opening
-        // OUTBOUND_FULL_RELAY connections gets the highest priority until we
-        // meet our full-relay capacity. Then we open BLOCK_RELAY connection
-        // until we hit our block-relay peer limit. GetTryNewOutboundPeer()
-        // gets set when a stale tip is detected, so we try opening an
-        // additional OUTBOUND_FULL_RELAY connection. If none of these
-        // conditions are met, check the nNextFeeler timer to decide if we
-        // should open a feeler.
-
-        if (nOutboundFullRelay < m_max_outbound_full_relay) {
-            // OUTBOUND_FULL_RELAY
-        } else if (nOutboundBlockRelay < m_max_outbound_block_relay) {
-            conn_type = ConnectionType::BLOCK_RELAY;
-        } else if (GetTryNewOutboundPeer()) {
-            // OUTBOUND_FULL_RELAY
-        } else if (nTime > nNextFeeler) {
-            nNextFeeler = PoissonNextSend(nTime, FEELER_INTERVAL);
-            conn_type = ConnectionType::FEELER;
-            fFeeler = true;
-        } else {
-            // skip to next iteration of while loop
-            continue;
-        }
-
-        addrman.ResolveCollisions();
-
-        int64_t nANow = GetAdjustedTime();
-        int nTries = 0;
-        while (!interruptNet)
-        {
-            CAddrInfo addr = addrman.SelectTriedCollision();
-
-            // SelectTriedCollision returns an invalid address if it is empty.
-            if (!fFeeler || !addr.IsValid()) {
-                addr = addrman.Select(fFeeler);
-            }
-
-            // Require outbound connections, other than feelers, to be to distinct network groups
-            if (!fFeeler && setConnected.count(addr.GetGroup(addrman.m_asmap))) {
-                break;
-            }
-
-            // if we selected an invalid or local address, restart
-            if (!addr.IsValid() || IsLocal(addr)) {
-                break;
-            }
-
-            // If we didn't find an appropriate destination after trying 100 addresses fetched from addrman,
-            // stop this loop, and let the outer loop run again (which sleeps, adds seed nodes, recalculates
-            // already-connected network ranges, ...) before trying new addrman addresses.
-            nTries++;
-            if (nTries > 100)
-                break;
-
-            if (!IsReachable(addr))
-                continue;
-
-            // only consider very recently tried nodes after 30 failed attempts
-            if (nANow - addr.nLastTry < 600 && nTries < 30)
-                continue;
-
-            // for non-feelers, require all the services we'll want,
-            // for feelers, only require they be a full node (only because most
-            // SPV clients don't have a good address DB available)
-            if (!fFeeler && !HasAllDesirableServiceFlags(addr.nServices)) {
-                continue;
-            } else if (fFeeler && !MayHaveUsefulAddressDB(addr.nServices)) {
-                continue;
-            }
-
-            // do not allow non-default ports, unless after 50 invalid addresses selected already
-            if (addr.GetPort() != Params().GetDefaultPort() && nTries < 50)
-                continue;
-
-            addrConnect = addr;
-            break;
-        }
-
-        if (addrConnect.IsValid()) {
-
-            if (fFeeler) {
-                // Add small amount of random noise before connection to avoid synchronization.
-                int randsleep = GetRandInt(FEELER_SLEEP_WINDOW * 1000);
-                if (!interruptNet.sleep_for(std::chrono::milliseconds(randsleep)))
-                    return;
-                LogPrint(BCLog::NET, "Making feeler connection to %s\n", addrConnect.ToString());
-            }
-
-            OpenNetworkConnection(addrConnect, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2), &grant, nullptr, conn_type);
-        }
+    while (!interruptNet) {
+        AttemptToOpenConnection(nStart, nNextFeeler);
     }
+
 }
+
 
 std::vector<AddedNodeInfo> CConnman::GetAddedNodeInfo()
 {

@@ -364,6 +364,7 @@ private:
     void ThreadOpenAddedConnections();
     void AddAddrFetch(const std::string& strDest);
     void ProcessAddrFetch();
+    void AttemptToOpenConnection(int64_t nStart, int64_t nNextFeeler);
     void ThreadOpenConnections(std::vector<std::string> connect);
     void ThreadMessageHandler();
     void AcceptConnection(const ListenSocket& hListenSocket);
