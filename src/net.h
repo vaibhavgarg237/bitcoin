@@ -177,6 +177,26 @@ enum class ConnectionType {
     ADDR_FETCH,
 };
 
+static std::string ConnectionTypeAsString(ConnectionType conn_type)
+{
+    switch (conn_type) {
+    case ConnectionType::INBOUND:
+        return "inbound";
+    case ConnectionType::MANUAL:
+        return "manual";
+    case ConnectionType::FEELER:
+        return "feeler";
+    case ConnectionType::OUTBOUND_FULL_RELAY:
+        return "outbound-full-relay";
+    case ConnectionType::BLOCK_RELAY:
+        return "block-relay-only";
+    case ConnectionType::ADDR_FETCH:
+        return "addr-fetch";
+    } // no default case, so the compiler can warn about missing cases
+
+    assert(false);
+}
+
 class NetEventsInterface;
 class CConnman
 {
@@ -697,7 +717,7 @@ public:
     // Bind address of our side of the connection
     CAddress addrBind;
     uint32_t m_mapped_as;
-    std::string m_conn_type_string;
+    ConnectionType m_conn_type;
 };
 
 
@@ -934,6 +954,8 @@ public:
         assert(false);
     }
 
+    std::string ConnectionTypeAsString() const { return ::ConnectionTypeAsString(m_conn_type); }
+
 protected:
     mapMsgCmdSize mapSendBytesPerMsgCmd;
     mapMsgCmdSize mapRecvBytesPerMsgCmd GUARDED_BY(cs_vRecv);
@@ -1154,8 +1176,6 @@ public:
     std::string GetAddrName() const;
     //! Sets the addrName only if it was not previously set
     void MaybeSetAddrName(const std::string& addrNameIn);
-
-    std::string ConnectionTypeAsString() const;
 };
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
