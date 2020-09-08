@@ -535,7 +535,7 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
     X(nTimeConnected);
     X(nTimeOffset);
     stats.addrName = GetAddrName();
-    X(nVersion);
+    stats.nVersion = m_greatest_common_version;
     {
         LOCK(cs_SubVer);
         X(cleanSubVer);

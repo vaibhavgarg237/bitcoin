@@ -836,7 +836,6 @@ public:
     const CAddress addr;
     // Bind address of our side of the connection
     const CAddress addrBind;
-    std::atomic<int> nVersion{0};
     RecursiveMutex cs_SubVer;
     /**
      * cleanSubVer is a sanitized string of the user agent byte array we read
@@ -1068,6 +1067,7 @@ public:
     {
         m_greatest_common_version = greatest_common_version;
     }
+
     int GetCommonVersion() const
     {
         return m_greatest_common_version;

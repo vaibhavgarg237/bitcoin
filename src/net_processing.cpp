@@ -2337,7 +2337,7 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
 
     if (msg_type == NetMsgType::VERSION) {
         // Each connection can only send one version message
-        if (pfrom.nVersion != 0)
+        if (pfrom.GetCommonVersion() != INIT_PROTO_VERSION)
         {
             Misbehaving(pfrom.GetId(), 1, "redundant version message");
             return;
@@ -2406,7 +2406,6 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
         // Change version
         const int greatest_common_version = std::min(nVersion, PROTOCOL_VERSION);
         pfrom.SetCommonVersion(greatest_common_version);
-        pfrom.nVersion = nVersion;
 
         if (greatest_common_version >= WTXID_RELAY_VERSION) {
             m_connman.PushMessage(&pfrom, CNetMsgMaker(greatest_common_version).Make(NetMsgType::WTXIDRELAY));
@@ -2491,7 +2490,7 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
             remoteAddr = ", peeraddr=" + pfrom.addr.ToString();
 
         LogPrint(BCLog::NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%d%s\n",
-                  cleanSubVer, pfrom.nVersion,
+                  cleanSubVer, pfrom.GetCommonVersion(),
                   pfrom.nStartingHeight, addrMe.ToString(), pfrom.GetId(),
                   remoteAddr);
 
@@ -2512,7 +2511,7 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
         return;
     }
 
-    if (pfrom.nVersion == 0) {
+    if (pfrom.GetCommonVersion() == 0) {
         // Must have a version message before anything else
         Misbehaving(pfrom.GetId(), 1, "non-version message before version handshake");
         return;
@@ -2528,7 +2527,7 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
             LOCK(cs_main);
             State(pfrom.GetId())->fCurrentlyConnected = true;
             LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s (%s)\n",
-                      pfrom.nVersion.load(), pfrom.nStartingHeight,
+                      pfrom.GetCommonVersion(), pfrom.nStartingHeight,
                       pfrom.GetId(), (fLogIPs ? strprintf(", peeraddr=%s", pfrom.addr.ToString()) : ""),
                       pfrom.m_tx_relay == nullptr ? "block-relay" : "full-relay");
         }
