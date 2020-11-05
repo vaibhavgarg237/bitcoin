@@ -12,7 +12,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
 
-class ResendWalletTransactionsTest(BitcoinTestFramework):
+class ResubmitWalletTransactionsToMempoolTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
 
@@ -28,7 +28,7 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
         txid = node.sendtoaddress(node.getnewaddress(), 1)
 
         # Wallet rebroadcast is first scheduled 1 sec after startup (see
-        # nNextResend in ResendWalletTransactions()). Tell scheduler to call
+        # nNextResend in ResubmitWalletTransactionsToMempool()). Tell scheduler to call
         # MaybeResendWalletTxn now to initialize nNextResend before the first
         # setmocktime call below.
         node.mockscheduler(1)
@@ -50,7 +50,7 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
         block.solve()
         node.submitblock(ToHex(block))
 
-        # Set correct m_best_block_time, which is used in ResendWalletTransactions
+        # Set correct m_best_block_time, which is used in ResubmitWalletTransactionsToMempool
         node.syncwithvalidationinterfacequeue()
         now = int(time.time())
 
@@ -65,7 +65,7 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
         self.log.info("Bump time & check that transaction is rebroadcast")
         # Transaction should be rebroadcast approximately 24 hours in the future,
         # but can range from 12-36. So bump 36 hours to be sure.
-        with node.assert_debug_log(['ResendWalletTransactions: resubmit 1 unconfirmed transactions']):
+        with node.assert_debug_log(['ResubmitWalletTransactionsToMempool: resubmit 1 unconfirmed transactions']):
             node.setmocktime(now + 36 * 60 * 60)
             # Tell scheduler to call MaybeResendWalletTxn now.
             node.mockscheduler(1)
@@ -75,4 +75,4 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    ResendWalletTransactionsTest().main()
+    ResubmitWalletTransactionsToMempoolTest().main()
