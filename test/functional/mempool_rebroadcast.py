@@ -17,6 +17,7 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.extra_args = [[
             "-whitelist=127.0.0.1",
+            "-rebroadcast=1"
         ]] * self.num_nodes
 
     def skip_test_if_missing_module(self):

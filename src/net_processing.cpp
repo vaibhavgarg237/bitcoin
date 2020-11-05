@@ -4323,7 +4323,7 @@ bool PeerManager::SendMessages(CNode* pto)
                 }
 
                 // Check for rebroadcasts
-                if (pto->m_next_rebroadcast < current_time) {
+                if (gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED) && pto->m_next_rebroadcast < current_time) {
                     // Schedule next rebroadcast
                     bool fFirst = (pto->m_next_rebroadcast.count() == 0);
                     pto->m_next_rebroadcast = PoissonNextSend(current_time, TX_REBROADCAST_INTERVAL);
