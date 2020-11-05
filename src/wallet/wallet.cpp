@@ -2088,7 +2088,7 @@ bool CWalletTx::IsEquivalentTo(const CWalletTx& _tx) const
 
 /** Once a day, resubmit all wallet transactions to the node, incase it has
  *  been dropped from our mempool. */
-void CWallet::ResendWalletTransactions()
+void CWallet::ResubmitWalletTransactionsToMempool()
 {
     // During reindex, importing and IBD, old wallet transactions become
     // unconfirmed. Don't need to resubmit to our node.
@@ -2121,7 +2121,7 @@ void CWallet::ResendWalletTransactions()
 void MaybeResendWalletTxs()
 {
     for (const std::shared_ptr<CWallet>& pwallet : GetWallets()) {
-        pwallet->ResendWalletTransactions();
+        pwallet->ResubmitWalletTransactionsToMempool();
     }
 }
 
