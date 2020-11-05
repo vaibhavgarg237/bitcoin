@@ -220,7 +220,7 @@ BASE_SCRIPTS = [
     'feature_dersig.py',
     'feature_cltv.py',
     'rpc_uptime.py',
-    'wallet_resendwallettransactions.py',
+    'wallet_resubmit_transactions.py',
     'wallet_fallbackfee.py',
     'rpc_dumptxoutset.py',
     'feature_minchainwork.py',

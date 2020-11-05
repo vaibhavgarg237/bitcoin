@@ -11,7 +11,7 @@ from test_framework.p2p import P2PTxInvStore
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-class ResendWalletTransactionsTest(BitcoinTestFramework):
+class ResubmitWalletTransactionsToMempoolTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
 
@@ -27,7 +27,7 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
         txid = node.sendtoaddress(node.getnewaddress(), 1)
 
         # Wallet rebroadcast is first scheduled 1 sec after startup (see
-        # nNextResend in ResendWalletTransactions()). Sleep for just over a
+        # nNextResend in ResubmitWalletTransactionsToMempool()). Sleep for just over a
         # second to be certain that it has been called before the first
         # setmocktime call below.
         time.sleep(1.1)
@@ -68,4 +68,4 @@ class ResendWalletTransactionsTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    ResendWalletTransactionsTest().main()
+    ResubmitWalletTransactionsToMempoolTest().main()
