@@ -4351,7 +4351,7 @@ bool PeerManager::SendMessages(CNode* pto)
                 }
 
                 // Check for rebroadcasts
-                if (pto->m_next_rebroadcast < current_time) {
+                if (gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED) && pto->m_next_rebroadcast < current_time) {
                     LogPrint(BCLog::NET, "Rebroadcast timer triggered\n");
                     // schedule next rebroadcast
                     bool fFirst = (pto->m_next_rebroadcast.count() == 0);
