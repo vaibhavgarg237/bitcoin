@@ -1389,8 +1389,9 @@ void PeerManagerImpl::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlock
     }
 
     // Rebroadcast selected mempool transactions
-    std::vector<TxIds> rebroadcast_txs = m_txrebroadcast.GetRebroadcastTransactions();
-    {
+    if (gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED)) {
+        std::vector<TxIds> rebroadcast_txs = m_txrebroadcast.GetRebroadcastTransactions();
+
         LOCK(cs_main);
 
         for (auto ids : rebroadcast_txs) {
