@@ -118,21 +118,24 @@ void CTxMemPool::GetRebroadcastTransactions(std::vector<uint256>& rebroadcastTxs
     LOCK(cs);
     int count = 0;
     for (const CTransactionRef& tx : pblocktemplate->block.vtx) {
-        txiter it = mapTx.find(tx->GetHash());
-        if (it == mapTx.end()) {
-            continue;
-        }
+        uint256 txhsh = wtxid ? tx->GetWitnessHash() : tx->GetHash();
+        auto wtxid_to_string = wtxid ? "true" : "false";
+        LogPrint(BCLog::MEMPOOL, "ABCD wtxid: %s, witness hash: %s, tx hash: %s, selected: %s\n", wtxid_to_string, tx->GetWitnessHash().GetHex(), tx->GetHash().GetHex(), txhsh.GetHex());
+        indexed_transaction_set::const_iterator it = wtxid ? get_iter_from_wtxid(txhsh) : mapTx.find(txhsh);
+        if (it == mapTx.end()) continue;
+
         CFeeRate fee_rate = CFeeRate(it->GetModifiedFee(), GetTransactionWeight(*tx));
 
+        LogPrint(BCLog::MEMPOOL, "ABCD wtxid: %s, fee_rate: %s", wtxid_to_string, fee_rate.ToString());
         // compare txn fee rate to cached value
         if (fee_rate > m_cached_fee_rate) {
             // add to rebroadcast set
-            rebroadcastTxs.push_back(tx->GetHash());
+            rebroadcastTxs.push_back(txhsh);
             count += 1;
         }
     }
 
-    LogPrint(BCLog::MEMPOOL, "%d transactions queued for rebroadcast, from %s candidates filtered with cached fee rate of %s. \n", count, pblocktemplate->block.vtx.size(), m_cached_fee_rate.ToString());
+    LogPrint(BCLog::MEMPOOL, "ABCD %d transactions queued for rebroadcast, from %s candidates filtered with cached fee rate of %s. \n", count, pblocktemplate->block.vtx.size(), m_cached_fee_rate.ToString());
 }
 
 void CTxMemPool::CacheMinRebroadcastFee()
@@ -146,7 +149,7 @@ void CTxMemPool::CacheMinRebroadcastFee()
     // update cache
     m_cached_fee_rate = BlockAssembler(*this, Params()).minTxFeeRate();
 
-    LogPrint(BCLog::MEMPOOL, "Rebroadcast cached_fee_rate has been updated to=%s \n", m_cached_fee_rate.ToString());
+    LogPrint(BCLog::MEMPOOL, "ABCD Rebroadcast cached_fee_rate has been updated to=%s \n", m_cached_fee_rate.ToString());
 }
 
 // vHashesToUpdate is the set of transaction hashes from a disconnected block

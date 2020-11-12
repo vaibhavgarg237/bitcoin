@@ -3509,8 +3509,10 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     }
 
     // Check timestamp against prev
-    if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
+    if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast()) {
+        LogPrintf("ABCD: GetBlockTime: %d, GetMedianTimePast: %d\n", block.GetBlockTime(), pindexPrev->GetMedianTimePast());
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "time-too-old", "block's timestamp is too early");
+    }
 
     // Check timestamp
     if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME)
