@@ -101,11 +101,13 @@ void CTxMemPool::UpdateForDescendants(txiter updateIt, cacheMap &cachedDescendan
     mapTx.modify(updateIt, update_descendant_state(modifySize, modifyFee, modifyCount));
 }
 
-void CTxMemPool::GetRebroadcastTransactions(std::vector<uint256>& rebroadcastTxs)
+std::vector<uint256> CTxMemPool::GetRebroadcastTransactions(bool wtxid)
 {
+    std::vector<uint256> rebroadcastTxs;
+
     // Don't rebroadcast txns during importing, reindex, or IBD to ensure we don't
     // accidentally spam our peers with old transactions.
-    if (::ChainstateActive().IsInitialBlockDownload() || ::fImporting || ::fReindex) return;
+    if (::ChainstateActive().IsInitialBlockDownload() || ::fImporting || ::fReindex) return rebroadcastTxs;
 
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
@@ -136,6 +138,7 @@ void CTxMemPool::GetRebroadcastTransactions(std::vector<uint256>& rebroadcastTxs
     }
 
     LogPrint(BCLog::MEMPOOL, "ABCD %d transactions queued for rebroadcast, from %s candidates filtered with cached fee rate of %s. \n", count, pblocktemplate->block.vtx.size(), m_cached_fee_rate.ToString());
+    return rebroadcastTxs;
 }
 
 void CTxMemPool::CacheMinRebroadcastFee()
@@ -873,8 +876,11 @@ TxMempoolInfo CTxMemPool::info(const GenTxid& gtxid) const
 {
     LOCK(cs);
     indexed_transaction_set::const_iterator i = (gtxid.IsWtxid() ? get_iter_from_wtxid(gtxid.GetHash()) : mapTx.find(gtxid.GetHash()));
-    if (i == mapTx.end())
+    auto is_wtxid_to_string = gtxid.IsWtxid() ? "true" : "false";
+    if (i == mapTx.end()) {
+        LogPrintf("ABCD xxx, gtxid.IsWtxid(): %s, hash: %s\n", is_wtxid_to_string, gtxid.GetHash().GetHex());
         return TxMempoolInfo();
+    }
     return GetInfo(i);
 }
 

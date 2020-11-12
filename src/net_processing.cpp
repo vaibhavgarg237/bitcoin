@@ -4366,11 +4366,10 @@ bool PeerManager::SendMessages(CNode* pto)
                     }
 
                     if (!fFirst && !fSkipRun) {
-                        std::vector<uint256> rebroadcastTxs;
-                        m_mempool.GetRebroadcastTransactions(rebroadcastTxs);
+                        std::vector<uint256> rebroadcastTxs = m_mempool.GetRebroadcastTransactions(state.m_wtxid_relay);
 
                         //for (const uint256& hash : rebroadcastTxs) {
-                            //LogPrint(BCLog::NET, "ABCD Attempt rebroadcast tx=%s peer=%d\n", hash.GetHex(), pto->GetId());
+                        //LogPrint(BCLog::NET, "ABCD Attempt rebroadcast tx=%s peer=%d\n", hash.GetHex(), pto->GetId());
                         //}
 
                         // add rebroadcast txns

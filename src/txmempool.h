@@ -680,7 +680,7 @@ public:
      * of rebroadcast candidates, filter them by comparing their fee rates with
      * the cached fee rate & populate rebroadcastTxs with remaining.
      */
-    void GetRebroadcastTransactions(std::vector<uint256>& rebroadcastTxs);
+    std::vector<uint256> GetRebroadcastTransactions(bool wtxid);
 
     /** Assemble a block from the local mempool and update a cache with the
      *  minimum fee rate for a package to be included.
