@@ -120,6 +120,7 @@ BASE_SCRIPTS = [
     'wallet_listreceivedby.py --descriptors',
     'wallet_abandonconflict.py',
     'wallet_abandonconflict.py --descriptors',
+    'mempool_rebroadcast.py',
     'feature_csv_activation.py',
     'rpc_rawtransaction.py',
     'rpc_rawtransaction.py --descriptors',
