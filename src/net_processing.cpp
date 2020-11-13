@@ -4324,6 +4324,7 @@ bool PeerManager::SendMessages(CNode* pto)
 
                 // Check for rebroadcasts
                 if (gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED) && pto->m_next_rebroadcast < current_time) {
+                    LogPrint(BCLog::NET, "ABCD Rebroadcast timer triggered\n");
                     // Schedule next rebroadcast
                     bool fFirst = (pto->m_next_rebroadcast.count() == 0);
                     pto->m_next_rebroadcast = PoissonNextSend(current_time, TX_REBROADCAST_INTERVAL);
@@ -4331,7 +4332,7 @@ bool PeerManager::SendMessages(CNode* pto)
                     // If there hasn't been a block since the last cache run, don't rebroadcast yet
                     bool fSkipRun = ::ChainActive().Tip() == m_mempool.m_tip_at_cache_time && false;
                     if (fSkipRun) {
-                        LogPrint(BCLog::NET, "Bumping rebroadcast time since no new blocks since last cache run\n");
+                        LogPrint(BCLog::NET, "ABCD Bumping rebroadcast time since no new blocks since last cache run\n");
                         m_mempool.m_next_min_fee_cache += REBROADCAST_FEE_RATE_CACHE_INTERVAL;
                         pto->m_next_rebroadcast = current_time + std::chrono::minutes{10};
                     }
@@ -4349,7 +4350,7 @@ bool PeerManager::SendMessages(CNode* pto)
                         auto size_before = pto->m_tx_relay->setInventoryTxToSend.size();
                         pto->m_tx_relay->setInventoryTxToSend.insert(rebroadcast_txs.begin(), rebroadcast_txs.end());
                         auto size_after = pto->m_tx_relay->setInventoryTxToSend.size();
-                        LogPrint(BCLog::NET, "Added %d rebroadcast transactions to setInventoryTxToSend for peer=%d\n", size_after - size_before, pto->GetId());
+                        LogPrint(BCLog::NET, "ABCD Added %d rebroadcast transactions to setInventoryTxToSend for peer=%d\n", size_after - size_before, pto->GetId());
                     }
                 }
 
@@ -4362,7 +4363,10 @@ bool PeerManager::SendMessages(CNode* pto)
                 // Time to send but the peer has requested we not relay transactions.
                 if (fSendTrickle) {
                     LOCK(pto->m_tx_relay->cs_filter);
-                    if (!pto->m_tx_relay->fRelayTxes) pto->m_tx_relay->setInventoryTxToSend.clear();
+                    if (!pto->m_tx_relay->fRelayTxes) {
+                        LogPrint(BCLog::NET, "ABCD clearing set inventory tx\n");
+                        pto->m_tx_relay->setInventoryTxToSend.clear();
+                    }
                 }
 
                 // Respond to BIP35 mempool requests
@@ -4403,6 +4407,9 @@ bool PeerManager::SendMessages(CNode* pto)
                 if (fSendTrickle) {
                     // Produce a vector with all candidates for sending
                     std::vector<std::set<uint256>::iterator> vInvTx;
+                    if (pto->m_tx_relay->setInventoryTxToSend.size() > 0) {
+                        LogPrint(BCLog::NET, "ABCD setInventoryTxToSend is size: %d when copying to vInvTx\n", pto->m_tx_relay->setInventoryTxToSend.size());
+                    }
                     vInvTx.reserve(pto->m_tx_relay->setInventoryTxToSend.size());
                     for (std::set<uint256>::iterator it = pto->m_tx_relay->setInventoryTxToSend.begin(); it != pto->m_tx_relay->setInventoryTxToSend.end(); it++) {
                         vInvTx.push_back(it);
@@ -4431,22 +4438,29 @@ bool PeerManager::SendMessages(CNode* pto)
                         pto->m_tx_relay->setInventoryTxToSend.erase(it);
                         // Check if not in the filter already
                         if (pto->m_tx_relay->filterInventoryKnown.contains(hash)) {
+                            LogPrint(BCLog::NET, "ABCD A\n");
                             continue;
                         }
                         // Not in the mempool anymore? don't bother sending it.
+                        GenTxid gentxid = ToGenTxid(inv);
                         auto txinfo = m_mempool.info(ToGenTxid(inv));
                         if (!txinfo.tx) {
+                            LOCK(m_mempool.cs);
+                            bool in_map_tx = m_mempool.mapTx.find(hash) != m_mempool.mapTx.end();
+                            LogPrint(BCLog::NET, "ABCD B, in map tx? : %s, hash: %s, gentxid hash: %s\n", in_map_tx, hash.GetHex(), gentxid.GetHash().GetHex());
                             continue;
                         }
                         auto txid = txinfo.tx->GetHash();
                         auto wtxid = txinfo.tx->GetWitnessHash();
                         // Peer told you to not send transactions at that feerate? Don't bother sending it.
                         if (txinfo.fee < filterrate.GetFee(txinfo.vsize)) {
+                            LogPrint(BCLog::NET, "ABCD C\n");
                             continue;
                         }
                         if (pto->m_tx_relay->pfilter && !pto->m_tx_relay->pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
                         // Send
                         State(pto->GetId())->m_recently_announced_invs.insert(hash);
+                        LogPrint(BCLog::NET, "ABCD adding inv %s to vInv\n", hash.GetHex());
                         vInv.push_back(inv);
                         nRelayedTransactions++;
                         {
@@ -4468,6 +4482,7 @@ bool PeerManager::SendMessages(CNode* pto)
                             }
                         }
                         if (vInv.size() == MAX_INV_SZ) {
+                            LogPrint(BCLog::NET, "ABCD sending an INV message to peer=%d\n", pto->GetId());
                             m_connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                             vInv.clear();
                         }
@@ -4484,8 +4499,10 @@ bool PeerManager::SendMessages(CNode* pto)
                 }
             }
         }
-        if (!vInv.empty())
+        if (!vInv.empty()) {
+            LogPrint(BCLog::NET, "ABCD sending an INV message to peer=%d\n", pto->GetId());
             m_connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
+        }
 
         // Detect whether we're stalling
         current_time = GetTime<std::chrono::microseconds>();

@@ -122,12 +122,16 @@ std::vector<uint256> CTxMemPool::GetRebroadcastTransactions(bool wtxid)
     for (const CTransactionRef& tx : pblocktemplate->block.vtx) {
         uint256 txhsh = wtxid ? tx->GetWitnessHash() : tx->GetHash();
 
+        auto wtxid_to_string = wtxid ? "true" : "false";
+        LogPrint(BCLog::MEMPOOL, "ABCD wtxid: %s, witness hash: %s, tx hash: %s, selected: %s\n", wtxid_to_string, tx->GetWitnessHash().GetHex(), tx->GetHash().GetHex(), txhsh.GetHex());
+
         // Confirm the transaction is still in the mempool
         indexed_transaction_set::const_iterator it = wtxid ? get_iter_from_wtxid(txhsh) : mapTx.find(txhsh);
         if (it == mapTx.end()) continue;
 
         // Compare transaction fee rate to cached value
         CFeeRate fee_rate = CFeeRate(it->GetModifiedFee(), GetTransactionWeight(*tx));
+        LogPrint(BCLog::MEMPOOL, "ABCD wtxid: %s, fee_rate: %s\n", wtxid_to_string, fee_rate.ToString());
         if (fee_rate > m_cached_fee_rate) {
             rebroadcast_txs.push_back(txhsh);
 
@@ -135,7 +139,7 @@ std::vector<uint256> CTxMemPool::GetRebroadcastTransactions(bool wtxid)
         }
     }
 
-    LogPrint(BCLog::MEMPOOL, "%d rebroadcast candidates identified, from %s candidates filtered with cached fee rate of %s.\n", count, pblocktemplate->block.vtx.size(), m_cached_fee_rate.ToString());
+    LogPrint(BCLog::MEMPOOL, "ABCD %d rebroadcast candidates identified, from %s candidates filtered with cached fee rate of %s.\n", count, pblocktemplate->block.vtx.size(), m_cached_fee_rate.ToString());
     return rebroadcast_txs;
 }
 
@@ -150,7 +154,7 @@ void CTxMemPool::CacheMinRebroadcastFee()
     // Update cache
     m_cached_fee_rate = BlockAssembler(*this, Params()).minTxFeeRate();
 
-    LogPrint(BCLog::MEMPOOL, "Rebroadcast cached_fee_rate has been updated to=%s \n", m_cached_fee_rate.ToString());
+    LogPrint(BCLog::MEMPOOL, "ABCD Rebroadcast cached_fee_rate has been updated to=%s \n", m_cached_fee_rate.ToString());
 }
 
 // vHashesToUpdate is the set of transaction hashes from a disconnected block
