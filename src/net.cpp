@@ -2169,7 +2169,7 @@ void CConnman::ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, ConnectionType conn_type)
+bool CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, ConnectionType conn_type)
 {
     assert(conn_type != ConnectionType::INBOUND);
 
@@ -2177,23 +2177,23 @@ void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
     // Initiate outbound network connection
     //
     if (interruptNet) {
-        return;
+        return false;
     }
     if (!fNetworkActive) {
-        return;
+        return false;
     }
     if (!pszDest) {
         bool banned_or_discouraged = m_banman && (m_banman->IsDiscouraged(addrConnect) || m_banman->IsBanned(addrConnect));
         if (IsLocal(addrConnect) || FindNode(static_cast<CNetAddr>(addrConnect)) || banned_or_discouraged || FindNode(addrConnect.ToStringIPPort())) {
-            return;
+            return false;
         }
     } else if (FindNode(std::string(pszDest)))
-        return;
+        return false;
 
     CNode* pnode = ConnectNode(addrConnect, pszDest, fCountFailure, conn_type);
 
     if (!pnode)
-        return;
+        return false;
     if (grantOutbound)
         grantOutbound->MoveTo(pnode->grantOutbound);
 
@@ -2202,6 +2202,8 @@ void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
         LOCK(cs_vNodes);
         vNodes.push_back(pnode);
     }
+
+    return true;
 }
 
 void CConnman::ThreadMessageHandler()
