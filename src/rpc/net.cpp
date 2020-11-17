@@ -300,25 +300,16 @@ static RPCHelpMan addnode()
 
     std::string strNode = request.params[0].get_str();
 
-    if (strCommand == "onetry")
-    {
-        CAddress addr;
-        const bool success = node.connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::MANUAL);
+    if (strCommand == "onetry") {
+        const bool success = node.connman->OpenNetworkConnection(CAddress(), false, nullptr, strNode.c_str(), ConnectionType::MANUAL);
 
         if (!success) {
             throw JSONRPCError(RPC_CLIENT_PEER_NOT_CONNECTED, "Error: Unable to open connection");
         }
-
-        return NullUniValue;
-    }
-
-    if (strCommand == "add")
-    {
+    } else if (strCommand == "add") {
         if(!node.connman->AddNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
-    }
-    else if(strCommand == "remove")
-    {
+    } else if (strCommand == "remove") {
         if(!node.connman->RemoveAddedNode(strNode))
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node could not be removed. It has not been added previously.");
     }
