@@ -1172,8 +1172,7 @@ bool CConnman::AddConnection(const std::string& address, const ConnectionType co
     CSemaphoreGrant grant(*semOutbound, true);
     if (!grant) return false;
 
-    OpenNetworkConnection(CAddress(), false, &grant, address.c_str(), conn_type);
-    return true;
+    return OpenNetworkConnection(CAddress(), false, &grant, address.c_str(), conn_type);
 }
 
 void CConnman::DisconnectNodes()

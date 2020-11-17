@@ -366,7 +366,7 @@ static RPCHelpMan addconnection()
 
     const bool success = context.connman->AddConnection(address, conn_type);
     if (!success) {
-        throw JSONRPCError(RPC_CLIENT_NODE_CAPACITY_REACHED, "Error: Already at capacity for specified connection type.");
+        throw JSONRPCError(RPC_CLIENT_PEER_NOT_CONNECTED, "Error: Unable to open connection");
     }
 
     UniValue info(UniValue::VOBJ);
