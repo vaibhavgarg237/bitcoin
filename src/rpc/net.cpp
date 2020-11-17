@@ -303,7 +303,12 @@ static RPCHelpMan addnode()
     if (strCommand == "onetry")
     {
         CAddress addr;
-        node.connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::MANUAL);
+        const bool success = node.connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str(), ConnectionType::MANUAL);
+
+        if (!success) {
+            throw JSONRPCError(RPC_CLIENT_PEER_NOT_CONNECTED, "Error: Unable to open connection");
+        }
+
         return NullUniValue;
     }
 
