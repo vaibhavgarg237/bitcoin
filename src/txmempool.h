@@ -36,7 +36,7 @@ extern RecursiveMutex cs_main;
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
 // Default minimum age for a transaction to be rebroadcast in seconds - 30 min
-static constexpr std::chrono::seconds REBROADCAST_MIN_TX_AGE = std::chrono::seconds{30 * 60};
+static constexpr std::chrono::minutes REBROADCAST_MIN_TX_AGE = std::chrono::minutes{30};
 
 // We rebroadcast 3/4 of max block weight to reduce noise due to circumstances
 // such as miners mining priority txns

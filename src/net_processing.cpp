@@ -147,7 +147,7 @@ static constexpr uint32_t MAX_GETCFHEADERS_SIZE = 2000;
 /** the maximum percentage of addresses from our addrman to return in response to a getaddr message. */
 static constexpr size_t MAX_PCT_ADDR_TO_SEND = 23;
 /** Average delay between rebroadcasts */
-static constexpr auto TX_REBROADCAST_INTERVAL = std::chrono::seconds{60 * 60};
+static constexpr auto TX_REBROADCAST_INTERVAL = std::chrono::hours{1};
 
 struct COrphanTx {
     // When modifying, adapt the copy of this definition in tests/DoS_tests.
@@ -4338,7 +4338,6 @@ bool PeerManager::SendMessages(CNode* pto)
                     }
 
                     if (!fFirst && !fSkipRun) {
-                        std::vector<uint256> rebroadcastTxs;
                         std::vector<uint256> rebroadcast_txs = m_mempool.GetRebroadcastTransactions(state.m_wtxid_relay);
 
                         for (const uint256& hash : rebroadcast_txs) {

@@ -6,7 +6,7 @@
 """
 
 from test_framework.p2p import (
-    P2PConnection,
+    P2PInterface,
     P2PTxInvStore,
 )
 from test_framework.test_framework import BitcoinTestFramework
@@ -22,9 +22,6 @@ from decimal import Decimal
 # Constant from consensus.h
 MAX_BLOCK_WEIGHT = 4000000
 
-global_mocktime = 0
-
-
 class MempoolRebroadcastTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
@@ -33,16 +30,15 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
             "-rebroadcast=1",
             "-txindex=1"
         ]] * self.num_nodes
+        self.mocktime = int(time.time())
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
 
     def run_test(self):
-        global global_mocktime
-        global_mocktime = int(time.time())
 
-        self.test_simple_rebroadcast()
-        # self.test_recency_filter()
+        # self.test_simple_rebroadcast()
+        self.test_recency_filter()
         # self.test_fee_rate_cache()
 
     def make_txn_at_fee_rate(self, input_utxo, outputs, outputs_sum, desired_fee_rate, change_address):
@@ -92,7 +88,6 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
     def test_simple_rebroadcast(self):
         self.log.info("Test simplest rebroadcast case")
 
-        global global_mocktime
         node = self.nodes[0]
         node1 = self.nodes[1]
 
@@ -122,9 +117,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         assert_equal(len(node.getrawmempool()), len(node1.getrawmempool()))
 
         # Ensure cache job runs, see REBROADCAST_FEE_RATE_CACHE_INTERVAL
-        global_mocktime += 21 * 60
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        self.mocktime += 21 * 60
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         time.sleep(1)
 
@@ -136,16 +131,16 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         self.disconnect_nodes(0, 1)
 
         # Add p2p connection to send a GETDATA and remove the transactions from the unbroadcast set
-        conn = node.add_p2p_connection(P2PTxInvStore())
+        conn = node.add_p2p_connection(P2PInterface())
 
         # TODO: this is timing out
         for _ in range(3):
             node.sendtoaddress(node1.getnewaddress(), 0.5)
 
         # Bump time forward to ensure nNextInvSend timer pops
-        global_mocktime += 5
-        self.nodes[0].setmocktime(global_mocktime)
-        self.nodes[1].setmocktime(global_mocktime)
+        self.mocktime += 5
+        self.nodes[0].setmocktime(self.mocktime)
+        self.nodes[1].setmocktime(self.mocktime)
         self.wait_until(lambda: conn.get_invs(), timeout=30)
 
         # Check that mempools are different by 3
@@ -155,9 +150,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         self.connect_nodes(0, 1)
 
         # Bump time to hit rebroadcast interval
-        global_mocktime += 300 * 60
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        self.mocktime += 300 * 60
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         # Check that node1 got the transactions due to rebroadcasting and now
         # has the same size mempool as node0
@@ -169,9 +164,8 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         node = self.nodes[0]
         node1 = self.nodes[1]
 
-        global global_mocktime
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         # Mine blocks to clear out the mempool
         node.generate(4)
@@ -187,9 +181,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         self.wait_until(lambda: len(node1.getrawmempool()) == 1, timeout=30)
 
         # Bump mocktime to age the transaction
-        global_mocktime += 31 * 60  # seconds
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        self.mocktime += 31 * 60  # seconds
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         # debugging
         assert_equal(len(node.getrawmempool()), 1)
@@ -202,20 +196,29 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         delta_time = 28 * 60  # seconds
         while True:
             assert_equal(node.getrawmempool(), node1.getrawmempool())
-            print("{} transactions in the mempools".format(len(node.getrawmempool())))
+            self.log.info("{} transactions in the mempools".format(len(node.getrawmempool())))
 
             # Create a recent transaction
             txhsh = node1.sendtoaddress(node1.getnewaddress(), 2)
             wtxhsh = node1.getmempoolentry(txhsh)['wtxid']
+            self.log.info("ABCD worrying about txhsh %s wtxhsh %s" % (txhsh, wtxhsh))
             new_wtxid = int(wtxhsh, 16)
 
             # Ensure node has the transaction, bump for next inv send delay
-            global_mocktime += 5
-            self.nodes[0].setmocktime(global_mocktime)
-            self.nodes[1].setmocktime(global_mocktime)
+            # todo: understand what this number actually should be
+            self.mocktime += 400
+            node.setmocktime(self.mocktime)
+            node1.setmocktime(self.mocktime)
             self.wait_until(lambda: txhsh in node.getrawmempool())
 
-            node.disconnect_p2ps()
+            # txhsh 9ea04da6d74aec2034fd4aba7987d8fadce07958cfda1aec3fe14c89e2f6bf89
+            # wtxhsh 09b8d07fc3379a3d9b2955eb92807ea11926c57314d48e5cc6fb50baa277b4c9
+
+            # txhsh d3de0bb8f606f8ddc13d10e63b0c7b5182eaff3f241fef2c6c0a5ba90a7c224e
+            # wtxhsh e5ad2a4869a0dd618ccb10141e8787920b8296d041a858edd68a55a9c83945c3
+            # node 0 TransactionAddedToMempool at mocktime 2020-11-24T 22:03:15
+            # node 0 AcceptToMemoryPool at mocktime 2020-11-24T 22:03:15
+            # node 0 Attempt to rebroadcast tx at mocktime 2020-11-24T 22:31:15Z
 
             # Add another p2p connection since transactions aren't rebroadcast
             # to the same peer (see filterInventoryKnown)
@@ -225,8 +228,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
 
             # Bump mocktime to try to get rebroadcast, but not so much that the
             # transaction would be old
-            global_mocktime += delta_time
-            node.setmocktime(global_mocktime)
+            self.mocktime += delta_time
+            node.setmocktime(self.mocktime)
+            node1.setmocktime(self.mocktime)
 
             time.sleep(1.1)
 
@@ -235,6 +239,8 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
             if new_conn.get_invs():
                 assert(new_wtxid not in new_conn.get_invs())
                 break
+
+            node.disconnect_p2ps()
 
         node.disconnect_p2ps()
 
@@ -246,9 +252,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
 
         assert_equal(len(node.p2ps), 0)
 
-        global_mocktime = int(time.time())
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        self.mocktime = int(time.time())
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         min_relay_fee = node.getnetworkinfo()["relayfee"]
         utxos = create_confirmed_utxos(min_relay_fee, node, 3000)
@@ -277,9 +283,9 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         assert_greater_than(node.getmempoolinfo()['bytes'], MAX_BLOCK_WEIGHT)
 
         # Ensure cache job runs, see REBROADCAST_FEE_RATE_CACHE_INTERVAL
-        global_mocktime += 21 * 60
-        node.setmocktime(global_mocktime)
-        node1.setmocktime(global_mocktime)
+        self.mocktime += 21 * 60
+        node.setmocktime(self.mocktime)
+        node1.setmocktime(self.mocktime)
 
         time.sleep(1)
 
@@ -311,14 +317,14 @@ class MempoolRebroadcastTest(BitcoinTestFramework):
         self.log.info("Trigger rebroadcast")
         conn = node.add_p2p_connection(P2PTxInvStore())
 
-        global_mocktime += 300 * 60
-        node.setmocktime(global_mocktime)
+        self.mocktime += 300 * 60
+        node.setmocktime(self.mocktime)
 
         time.sleep(0.5)  # Ensure send message thread runs so invs get sent
 
         # Bump time forward to ensure nNextInvSend timer pops
-        global_mocktime += 5
-        self.nodes[0].setmocktime(global_mocktime)
+        self.mocktime += 5
+        self.nodes[0].setmocktime(self.mocktime)
 
         self.wait_until(lambda: conn.get_invs(), timeout=30)
         rebroadcasted_invs = conn.get_invs()

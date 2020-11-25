@@ -165,8 +165,8 @@ public:
     static Optional<int64_t> m_last_block_num_txs;
     static Optional<int64_t> m_last_block_weight;
 
-    /** Wrapper to addPackageTxs that returns the minimum fee rate of a package
-      * included in the block. Used for rebroadcast cache. */
+    /** Returns the minimum fee rate of a package included in the block. Used
+     *  for rebroadcast cache. */
     CFeeRate minTxFeeRate();
 
 private:

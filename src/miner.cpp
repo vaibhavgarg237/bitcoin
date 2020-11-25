@@ -290,7 +290,10 @@ int BlockAssembler::UpdatePackagesForAdded(const CTxMemPool::setEntries& already
 bool BlockAssembler::SkipMapTxEntry(CTxMemPool::txiter it, indexed_modified_transaction_set &mapModifiedTx, CTxMemPool::setEntries &failedTx)
 {
     assert(it != m_mempool.mapTx.end());
-    if (it->GetTime() > m_skip_inclusion_until) return true; // transaction is too recent
+    if (it->GetTime() > m_skip_inclusion_until) {
+        // log it->GetTime()
+        return true; // transaction is too recent
+    }
     return mapModifiedTx.count(it) || inBlock.count(it) || failedTx.count(it);
 }
 
