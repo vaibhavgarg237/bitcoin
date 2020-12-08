@@ -202,8 +202,7 @@ bool IsPeerAddrLocalGood(CNode *pnode)
 // pushes our own address to a peer
 void AdvertiseLocal(CNode *pnode)
 {
-    if (fListen && pnode->fSuccessfullyConnected)
-    {
+    if (fListen && pnode->m_connection_phase == ConnectionPhase::RELAY) {
         CAddress addrLocal = GetLocalAddress(&pnode->addr, pnode->GetLocalServices());
         if (gArgs.GetBoolArg("-addrmantest", false)) {
             // use IPv4 loopback during addrmantest
@@ -357,8 +356,10 @@ bool CConnman::CheckIncomingNonce(uint64_t nonce)
 {
     LOCK(cs_vNodes);
     for (const CNode* pnode : vNodes) {
-        if (!pnode->fSuccessfullyConnected && !pnode->IsInboundConn() && pnode->GetLocalNonce() == nonce)
+        if (pnode->m_connection_phase != ConnectionPhase::RELAY &&
+            !pnode->IsInboundConn() && pnode->GetLocalNonce() == nonce) {
             return false;
+        }
     }
     return true;
 }
@@ -1251,7 +1252,7 @@ bool CConnman::InactivityCheck(const CNode& node) const
         return true;
     }
 
-    if (!node.fSuccessfullyConnected) {
+    if (node.m_connection_phase != ConnectionPhase::RELAY) {
         LogPrint(BCLog::NET, "version handshake timeout from %d\n", node.GetId());
         return true;
     }
@@ -1611,7 +1612,10 @@ void CConnman::ThreadDNSAddressSeed()
                     {
                         LOCK(cs_vNodes);
                         for (const CNode* pnode : vNodes) {
-                            if (pnode->fSuccessfullyConnected && pnode->IsOutboundOrBlockRelayConn()) ++nRelevant;
+                            if (pnode->m_connection_phase == ConnectionPhase::RELAY &&
+                                pnode->IsOutboundOrBlockRelayConn()) {
+                                ++nRelevant;
+                            }
                         }
                     }
                     if (nRelevant >= 2) {
@@ -1721,7 +1725,8 @@ int CConnman::GetExtraFullOutboundCount()
     {
         LOCK(cs_vNodes);
         for (const CNode* pnode : vNodes) {
-            if (pnode->fSuccessfullyConnected && !pnode->fDisconnect && pnode->IsFullOutboundConn()) {
+            if (pnode->m_connection_phase == ConnectionPhase::RELAY &&
+                !pnode->fDisconnect && pnode->IsFullOutboundConn()) {
                 ++full_outbound_peers;
             }
         }
@@ -1735,7 +1740,7 @@ int CConnman::GetExtraBlockRelayCount()
     {
         LOCK(cs_vNodes);
         for (const CNode* pnode : vNodes) {
-            if (pnode->fSuccessfullyConnected && !pnode->fDisconnect && pnode->IsBlockOnlyConn()) {
+            if (pnode->m_connection_phase == ConnectionPhase::RELAY && !pnode->fDisconnect && pnode->IsBlockOnlyConn()) {
                 ++block_relay_peers;
             }
         }
@@ -2867,7 +2872,7 @@ CNode::~CNode()
 
 bool CConnman::NodeFullyConnected(const CNode* pnode)
 {
-    return pnode && pnode->fSuccessfullyConnected && !pnode->fDisconnect;
+    return pnode && pnode->m_connection_phase == ConnectionPhase::RELAY && !pnode->fDisconnect;
 }
 
 void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)

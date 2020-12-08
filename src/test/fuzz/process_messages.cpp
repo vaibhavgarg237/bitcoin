@@ -47,7 +47,7 @@ FUZZ_TARGET_INIT(process_messages, initialize_process_messages)
         CNode& p2p_node = *peers.back();
         FillNode(fuzzed_data_provider, p2p_node);
 
-        p2p_node.fSuccessfullyConnected = true;
+        p2p_node.m_connection_state = ConnectionState::FULLY_CONNECTED;
         p2p_node.fPauseSend = false;
         g_setup->m_node.peerman->InitializeNode(&p2p_node);
 

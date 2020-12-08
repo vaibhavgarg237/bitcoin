@@ -989,8 +989,8 @@ void PeerManagerImpl::FinalizeNode(const CNode& node, bool& fUpdateConnectionTim
     if (state->fSyncStarted)
         nSyncStarted--;
 
-    if (node.fSuccessfullyConnected && misbehavior == 0 &&
-        !node.IsBlockOnlyConn() && !node.IsInboundConn()) {
+    if (node.m_connection_phase == ConnectionPhase::RELAY &&
+        misbehavior == 0 && !node.IsBlockOnlyConn() && !node.IsInboundConn()) {
         // Only change visible addrman state for outbound, full-relay peers
         fUpdateConnectionTime = true;
     }
@@ -2471,7 +2471,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     if (peer == nullptr) return;
 
     if (msg_type == NetMsgType::VERSION) {
-        if (pfrom.nVersion != 0) {
+        // Each connection can only send one version message
+        if (pfrom.m_connection_phase != ConnectionPhase::NEW) {
             LogPrint(BCLog::NET, "redundant version message from peer=%d\n", pfrom.GetId());
             return;
         }
@@ -2665,7 +2666,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         return;
     }
 
-    if (pfrom.nVersion == 0) {
+    if (pfrom.m_connection_phase == ConnectionPhase::NEW) {
         // Must have a version message before anything else
         LogPrint(BCLog::NET, "non-version message before version handshake. Message \"%s\" from peer=%d\n", SanitizeString(msg_type), pfrom.GetId());
         return;
@@ -2675,7 +2676,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     const CNetMsgMaker msgMaker(pfrom.GetCommonVersion());
 
     if (msg_type == NetMsgType::VERACK) {
-        if (pfrom.fSuccessfullyConnected) return;
+        if (pfrom.m_connection_phase == ConnectionPhase::RELAY) return;
 
         if (!pfrom.IsInboundConn()) {
             LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s (%s)\n",
@@ -2704,7 +2705,6 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             nCMPCTBLOCKVersion = 1;
             m_connman.PushMessage(&pfrom, msgMaker.Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
         }
-        pfrom.fSuccessfullyConnected = true;
         pfrom.m_connection_phase = ConnectionPhase::RELAY;
         return;
     }
@@ -2745,7 +2745,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     // Feature negotiation of wtxidrelay must happen between VERSION and VERACK
     // to avoid relay problems from switching after a connection is up.
     if (msg_type == NetMsgType::WTXIDRELAY) {
-        if (pfrom.fSuccessfullyConnected) {
+        if (pfrom.m_connection_phase == ConnectionPhase::RELAY) {
             // Disconnect peers that send wtxidrelay message after VERACK; this
             // must be negotiated between VERSION and VERACK.
             pfrom.fDisconnect = true;
@@ -2762,7 +2762,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     }
 
     if (msg_type == NetMsgType::SENDADDRV2) {
-        if (pfrom.fSuccessfullyConnected) {
+        if (pfrom.m_connection_phase == ConnectionPhase::RELAY) {
             // Disconnect peers that send SENDADDRV2 message after VERACK; this
             // must be negotiated between VERSION and VERACK.
             pfrom.fDisconnect = true;
@@ -2772,7 +2772,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         return;
     }
 
-    if (!pfrom.fSuccessfullyConnected) {
+    if (pfrom.m_connection_phase != ConnectionPhase::RELAY) {
         LogPrint(BCLog::NET, "Unsupported message \"%s\" prior to verack from peer=%d\n", SanitizeString(msg_type), pfrom.GetId());
         return;
     }
@@ -4279,8 +4279,9 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
     if (MaybeDiscourageAndDisconnect(*pto)) return true;
 
     // Don't send anything until the version handshake is complete
-    if (!pto->fSuccessfullyConnected || pto->fDisconnect)
+    if (pto->m_connection_phase != ConnectionPhase::RELAY || pto->fDisconnect) {
         return true;
+    }
 
     // If we get here, the outgoing message serialization version is set and can't change.
     const CNetMsgMaker msgMaker(pto->GetCommonVersion());
