@@ -190,6 +190,21 @@ enum
     LOCAL_MAX
 };
 
+/** The state of this connection. */
+enum class ConnectionPhase {
+    /** Initial state when the TCP connection is first established. No P2P
+     * messages have been received from this peer. */
+    NEW,
+
+    /** Set once a version message has been received from this peer.
+     * Features are being negotiated with this peer. */
+    NEGOTIATION,
+
+    /** We have received version and verack messages, and are relaying
+     * inventory messages */
+    RELAY,
+};
+
 bool IsPeerAddrLocalGood(CNode *pnode);
 void AdvertiseLocal(CNode *pnode);
 
@@ -442,6 +457,10 @@ public:
      */
     std::atomic_bool m_wants_addrv2{false};
     std::atomic_bool fSuccessfullyConnected{false};
+
+    /** Phase of the connection based on the version/verack handshake. */
+    std::atomic<ConnectionPhase> m_connection_phase{ConnectionPhase::NEW};
+
     // Setting fDisconnect to true will cause the node to be disconnected the
     // next time DisconnectNodes() runs
     std::atomic_bool fDisconnect{false};

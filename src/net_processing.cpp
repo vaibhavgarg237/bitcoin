@@ -2540,6 +2540,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         const int greatest_common_version = std::min(nVersion, PROTOCOL_VERSION);
         pfrom.SetCommonVersion(greatest_common_version);
         pfrom.nVersion = nVersion;
+        pfrom.m_connection_phase = ConnectionPhase::NEGOTIATION;
 
         const CNetMsgMaker msg_maker(greatest_common_version);
 
@@ -2704,6 +2705,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             m_connman.PushMessage(&pfrom, msgMaker.Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
         }
         pfrom.fSuccessfullyConnected = true;
+        pfrom.m_connection_phase = ConnectionPhase::RELAY;
         return;
     }
 
