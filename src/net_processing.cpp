@@ -2520,18 +2520,22 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
     // VERACK, to avoid relay problems from switching after a connection is up
     if (msg_type == NetMsgType::WTXIDRELAY) {
         if (pfrom.fSuccessfullyConnected) {
+            LogPrint(BCLog::NET, "wtxidrelay message received - invalid because sent after VERACK. peer: %d\n", pfrom.GetId());
             // Disconnect peers that send wtxidrelay message after VERACK; this
             // must be negotiated between VERSION and VERACK.
             pfrom.fDisconnect = true;
             return;
         }
         if (pfrom.GetCommonVersion() >= WTXID_RELAY_VERSION) {
+            LogPrint(BCLog::NET, "wtxidrelay message received - success. peer: %d\n", pfrom.GetId());
             LOCK(cs_main);
             if (!State(pfrom.GetId())->m_wtxid_relay) {
                 State(pfrom.GetId())->m_wtxid_relay = true;
                 g_wtxid_relay_peers++;
             }
         }
+
+        LogPrint(BCLog::NET, "wtxidrelay message received - invalid because of incompatible version. peer: %d, greatest_common_version: %d\n", pfrom.GetId(), pfrom.GetCommonVersion());
         return;
     }
 
