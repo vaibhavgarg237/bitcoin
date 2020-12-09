@@ -139,6 +139,7 @@ static RPCHelpMan getpeerinfo()
                             {
                                 {RPCResult::Type::NUM, "n", "The heights of blocks we're currently asking from this peer"},
                             }},
+                            {RPCResult::Type::BOOL, "is_wtxid_peer", "Whether we are participating in wtxid relay with this peer"},
                             {RPCResult::Type::BOOL, "whitelisted", /* optional */ true, "Whether the peer is whitelisted with default permissions\n"
                                                                                         "(DEPRECATED, returned only if config option -deprecatedrpc=whitelisted is passed)"},
                             {RPCResult::Type::NUM, "minfeefilter", "The minimum fee rate for transactions this peer accepts"},
@@ -232,6 +233,7 @@ static RPCHelpMan getpeerinfo()
                 heights.push_back(height);
             }
             obj.pushKV("inflight", heights);
+            obj.pushKV("is_wtxid_peer", statestats.m_is_wtxid_peer);
         }
         if (IsDeprecatedRPCEnabled("whitelisted")) {
             // whitelisted is deprecated in v0.21 for removal in v0.22

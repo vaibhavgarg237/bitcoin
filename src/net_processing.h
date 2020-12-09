@@ -150,6 +150,7 @@ struct CNodeStateStats {
     int nSyncHeight = -1;
     int nCommonHeight = -1;
     std::vector<int> vHeightInFlight;
+    bool m_is_wtxid_peer;
 };
 
 /** Get statistics from node state */

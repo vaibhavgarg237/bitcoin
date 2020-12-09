@@ -101,6 +101,8 @@ class NetTest(BitcoinTestFramework):
         assert_equal(peer_info[1][0]['connection_type'], 'manual')
         assert_equal(peer_info[1][1]['connection_type'], 'inbound')
 
+        assert_equal(peer_info[0][0]['is_wtxid_peer'], True)
+
     def test_getnettotals(self):
         self.log.info("Test getnettotals")
         # Test getnettotals and getpeerinfo by doing a ping. The bytes

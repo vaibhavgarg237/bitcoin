@@ -899,6 +899,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
             if (queue.pindex)
                 stats.vHeightInFlight.push_back(queue.pindex->nHeight);
         }
+        stats.m_is_wtxid_peer = state->m_wtxid_relay;
     }
 
     PeerRef peer = GetPeerRef(nodeid);
