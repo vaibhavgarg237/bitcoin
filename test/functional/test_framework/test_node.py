@@ -338,9 +338,6 @@ class TestNode():
 
         del self.p2ps[:]
 
-        # reset the index for outbound p2p connections
-        self.p2p_conn_index = 1
-
     def is_node_stopped(self):
         """Checks whether the node has stopped.
 
@@ -546,7 +543,7 @@ class TestNode():
 
         return p2p_conn
 
-    def add_outbound_p2p_connection(self, p2p_conn, *, connection_type="outbound-full-relay", **kwargs):
+    def add_outbound_p2p_connection(self, p2p_conn, *, p2p_idx, connection_type="outbound-full-relay", **kwargs):
         """Add an outbound p2p connection from node. Either
         full-relay("outbound-full-relay") or
         block-relay-only("block-relay-only") connection.
@@ -559,8 +556,7 @@ class TestNode():
             self.log.debug("Connecting to %s:%d %s" % (address, port, connection_type))
             self.addconnection('%s:%d' % (address, port), connection_type)
 
-        p2p_conn.peer_accept_connection(connect_cb=addconnection_callback, connect_id=self.p2p_conn_index, net=self.chain, timeout_factor=self.timeout_factor, **kwargs)()
-        self.p2p_conn_index += 1
+        p2p_conn.peer_accept_connection(connect_cb=addconnection_callback, connect_id=p2p_idx + 1, net=self.chain, timeout_factor=self.timeout_factor, **kwargs)()
 
         p2p_conn.wait_for_connect()
         self.p2ps.append(p2p_conn)
@@ -580,8 +576,6 @@ class TestNode():
             p.peer_disconnect()
         del self.p2ps[:]
 
-        # reset connection index for outbound p2ps
-        self.p2p_conn_index = 1
         wait_until_helper(lambda: self.num_test_p2p_connections() == 0, timeout_factor=self.timeout_factor)
 
 
