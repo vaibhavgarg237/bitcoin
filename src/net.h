@@ -351,9 +351,11 @@ public:
      *
      * @param[in]   address     Address of node to try connecting to
      * @param[in]   conn_type   ConnectionType::OUTBOUND or ConnectionType::BLOCK_RELAY
-     * @return      bool        Returns false if at max connection capacity for
-     *                          given connection type or at max total outbound
-     *                          connection capacity
+     * @return      bool        Returns false if there is no available
+     *                          allocated slots for opening this connection:
+     *                          - conn_type not a supported ConnectionType
+     *                          - Max total outbound connection capacity filled
+     *                          - Max connection capacity for type is filled
      */
     bool AddConnection(const std::string& address, ConnectionType conn_type);
 

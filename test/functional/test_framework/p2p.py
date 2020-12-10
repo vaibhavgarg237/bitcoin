@@ -568,28 +568,42 @@ class NetworkThread(threading.Thread):
 
     @classmethod
     def listen(cls, p2p, callback, port=None, addr=None, idx=1):
+        """ Ensure a listening server is running on the given port, and run the
+        protocol specified by `p2p` on the next connection to it. Once ready
+        for connections, call `callback`."""
+
         if port is None:
             assert 0 < idx <= MAX_NODES
             port = p2p_port(MAX_NODES - idx)
         if addr is None:
             addr = '127.0.0.1'
+
         coroutine = cls.create_listen_server(addr, port, callback, p2p)
         cls.network_event_loop.call_soon_threadsafe(cls.network_event_loop.create_task, coroutine)
 
     @classmethod
-    def peer_listener(cls, addr, port):
-        def pl():
-            x = cls.protos.get((addr, port))
-            cls.protos[(addr, port)] = None
-            return x
-        return pl
-
-    @classmethod
     async def create_listen_server(cls, addr, port, callback, proto):
+        def peer_protocol():
+            """Returns a function that does the protocol handling for a new
+            connection. To allow different connections to have different
+            behaviors, the protocol function is first put in the cls.protos
+            dict.  When the connection is made, the function removes the
+            protocol function from that dict, and returns it so the event loop
+            can start executing it."""
+            response = cls.protos.get((addr, port))
+            cls.protos[(addr, port)] = None
+            return response
+
         if (addr, port) not in cls.listeners:
-            listener = await cls.network_event_loop.create_server(cls.peer_listener(addr, port), addr, port)
+            # When creating a listener on a given addr, port we only need to do
+            # it once. If we want different behaviors for different
+            # connections, we can accomplish this by providing different
+            # `proto` functions
+
+            listener = await cls.network_event_loop.create_server(peer_protocol, addr, port)
             logger.debug("Listening server on %s:%d should be started" % (addr, port))
             cls.listeners[(addr, port)] = listener
+
         cls.protos[(addr, port)] = proto
         callback(addr, port)
 

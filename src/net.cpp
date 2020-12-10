@@ -1145,16 +1145,14 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
 
 bool CConnman::AddConnection(const std::string& address, ConnectionType conn_type)
 {
-    assert(conn_type == ConnectionType::OUTBOUND_FULL_RELAY || conn_type == ConnectionType::BLOCK_RELAY);
+    if (conn_type != ConnectionType::OUTBOUND_FULL_RELAY && conn_type != ConnectionType::BLOCK_RELAY) return false;
 
     const int max_connections = conn_type == ConnectionType::OUTBOUND_FULL_RELAY ? m_max_outbound_full_relay : m_max_outbound_block_relay;
 
     // Count existing connections
-    int existing_connections{0};
-    {
-        LOCK(cs_vNodes);
-        existing_connections = std::count_if(vNodes.begin(), vNodes.end(), [conn_type](CNode* node) { return node->m_conn_type == conn_type; });
-    }
+    int existing_connections = WITH_LOCK(cs_vNodes,
+        return std::count_if(vNodes.begin(), vNodes.end(), [conn_type](CNode* node){ return node->m_conn_type == conn_type; });
+    );
 
     // Max connections of specified type already exist
     if (existing_connections >= max_connections) return false;

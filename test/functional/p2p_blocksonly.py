@@ -78,12 +78,12 @@ class P2PBlocksOnly(BitcoinTestFramework):
         assert_equal(self.nodes[0].getnetworkinfo()['localrelay'], True)
 
         # Ensure we disconnect if a block-relay-only connection sends us a transaction
-        self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="blockrelay")
+        self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="block-relay-only")
         assert_equal(self.nodes[0].getpeerinfo()[0]['relaytxes'], False)
         _, txid, tx_hex = self.check_p2p_tx_violation(index=2)
 
         self.log.info("Check that txs from RPC are not sent to blockrelay connection")
-        conn = self.nodes[0].add_outbound_p2p_connection(P2PTxInvStore(), connection_type="blockrelay")
+        conn = self.nodes[0].add_outbound_p2p_connection(P2PTxInvStore(), connection_type="block-relay-only")
 
         self.nodes[0].sendrawtransaction(tx_hex)
 

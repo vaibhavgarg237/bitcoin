@@ -28,17 +28,17 @@ class P2PAddConnections(BitcoinTestFramework):
         self.log.info("Add 8 outbounds to node 0")
         for i in range(8):
             self.log.info(f"outbound: {i}")
-            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="outbound")
+            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="outbound-full-relay")
 
         self.log.info("Add 2 block-relay-only connections to node 0")
         for i in range(2):
             self.log.info(f"block-relay-only: {i}")
-            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="blockrelay")
+            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="block-relay-only")
 
         self.log.info("Add 2 block-relay-only connections to node 1")
         for i in range(2):
             self.log.info(f"block-relay-only: {i}")
-            self.nodes[1].add_outbound_p2p_connection(P2PInterface(), connection_type="blockrelay")
+            self.nodes[1].add_outbound_p2p_connection(P2PInterface(), connection_type="block-relay-only")
 
         self.log.info("Add 5 inbound connections to node 1")
         for i in range(5):
@@ -67,7 +67,7 @@ class P2PAddConnections(BitcoinTestFramework):
         self.log.info("Add 2 block-relay-only connections to node 0")
         for i in range(2):
             self.log.info(f"block-relay-only: {i}")
-            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="blockrelay")
+            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="block-relay-only")
         check_node_connections(node=self.nodes[0], num_in=0, num_out=10)
 
         self.log.info("Restart node 0 and try to reconnect to p2ps")
@@ -82,7 +82,7 @@ class P2PAddConnections(BitcoinTestFramework):
         self.log.info("Add 2 block-relay-only connections to node 0")
         for i in range(2):
             self.log.info(f"block-relay-only: {i}")
-            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="blockrelay")
+            self.nodes[0].add_outbound_p2p_connection(P2PInterface(), connection_type="block-relay-only")
         check_node_connections(node=self.nodes[0], num_in=0, num_out=6)
 
         check_node_connections(node=self.nodes[1], num_in=5, num_out=10)

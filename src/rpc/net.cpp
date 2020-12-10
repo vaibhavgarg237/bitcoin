@@ -329,7 +329,7 @@ static RPCHelpMan addconnection()
         "\nOpen an outbound connection to a specified node. This RPC is for testing only.\n",
         {
             {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The IP address and port to attempt connecting to."},
-            {"connection_type", RPCArg::Type::STR, RPCArg::Optional::NO, "Type of connection to open, either \"outbound\" or \"blockrelay\"."},
+            {"connection_type", RPCArg::Type::STR, RPCArg::Optional::NO, "Type of connection to open, either \"outbound-full-relay\" or \"block-relay-only\"."},
         },
         RPCResult{
             RPCResult::Type::OBJ, "", "",
@@ -338,8 +338,8 @@ static RPCHelpMan addconnection()
                 { RPCResult::Type::STR, "connection_type", "Type of connection opened." },
             }},
         RPCExamples{
-            HelpExampleCli("addconnection", "\"192.168.0.6:8333\" \"outbound\"")
-            + HelpExampleRpc("addconnection", "\"192.168.0.6:8333\" \"outbound\"")
+            HelpExampleCli("addconnection", "\"192.168.0.6:8333\" \"outbound-full-relay\"")
+            + HelpExampleRpc("addconnection", "\"192.168.0.6:8333\" \"outbound-full-relay\"")
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
@@ -349,11 +349,11 @@ static RPCHelpMan addconnection()
 
     RPCTypeCheck(request.params, {UniValue::VSTR, UniValue::VSTR});
     const std::string address = request.params[0].get_str();
-    const std::string conn_type_in{ToLower(TrimString(request.params[1].get_str()))};
+    const std::string conn_type_in{TrimString(request.params[1].get_str())};
     ConnectionType conn_type{};
-    if (conn_type_in == "outbound") {
+    if (conn_type_in == "outbound-full-relay") {
         conn_type = ConnectionType::OUTBOUND_FULL_RELAY;
-    } else if (conn_type_in == "blockrelay") {
+    } else if (conn_type_in == "block-relay-only") {
         conn_type = ConnectionType::BLOCK_RELAY;
     } else {
         throw JSONRPCError(RPC_INVALID_PARAMETER, self.ToString());
