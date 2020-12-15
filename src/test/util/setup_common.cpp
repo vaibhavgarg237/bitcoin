@@ -214,6 +214,16 @@ TestChain100Setup::TestChain100Setup()
     }
 }
 
+CKey RegTestingSetup::MakeNewKeyWithFastRandomContext()
+{
+    CKey key;
+    std::vector<unsigned char> keydata;
+    keydata = g_insecure_rand_ctx.randbytes(32);
+    key.Set(keydata.data(), keydata.data() + keydata.size(), /*fCompressedIn*/ true);
+    assert(key.IsValid());
+    return key;
+}
+
 CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>& txns, const CScript& scriptPubKey)
 {
     const CChainParams& chainparams = Params();
@@ -232,6 +242,50 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     Assert(m_node.chainman)->ProcessNewBlock(chainparams, shared_pblock, true, nullptr);
 
     return block;
+}
+
+
+CMutableTransaction TestChain100Setup::CreateMempoolTransaction(CTransactionRef transaction_to_spend, CAmount amount_to_send)
+{
+    CMutableTransaction mempool_txn;
+
+    // Create an input
+    // - Spends the first coinbase transaction
+    COutPoint outpoint_to_spend = COutPoint(transaction_to_spend->GetHash(), 0);
+    CTxIn input(outpoint_to_spend, CScript(), CTxIn::SEQUENCE_FINAL);
+    mempool_txn.vin.push_back(input);
+
+    // Create an output
+    // - One output that spends the amount_to_send passed in
+    // - Generate a new key, then turn into CScript for the public key
+    CKey key = MakeNewKeyWithFastRandomContext();
+    CTxOut output(amount_to_send, GetScriptForDestination(PKHash(key.GetPubKey())));
+    mempool_txn.vout.push_back(output);
+
+    // Sign the transaction
+    // - Add the signing key to a keystore
+    FillableSigningProvider keystore;
+    keystore.AddKey(coinbaseKey);
+    // - Populate a CoinsViewCache with the unspent output
+    CCoinsView coins_view;
+    CCoinsViewCache coins_cache(&coins_view);
+    AddCoins(coins_cache, *transaction_to_spend.get(), 1);
+    // - Use GetCoin to properly populate utxo_to_spend,
+    // - Then add it to a map to pass in to SignTransaction
+    Coin utxo_to_spend;
+    coins_cache.GetCoin(outpoint_to_spend, utxo_to_spend);
+    std::map<COutPoint, Coin> input_coins;
+    input_coins.insert({outpoint_to_spend, utxo_to_spend});
+    // - Default signature hashing type
+    int nHashType = SIGHASH_ALL;
+    std::map<int, std::string> input_errors;
+    SignTransaction(mempool_txn, &keystore, input_coins, nHashType, input_errors);
+
+    // Add transaction to the mempool
+    TxValidationState state;
+    WITH_LOCK(cs_main, AcceptToMemoryPool(*m_node.mempool.get(), state, MakeTransactionRef(mempool_txn), nullptr, false));
+
+    return mempool_txn;
 }
 
 TestChain100Setup::~TestChain100Setup()

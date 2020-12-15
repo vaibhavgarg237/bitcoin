@@ -104,6 +104,8 @@ struct TestingSetup : public ChainTestingSetup {
 struct RegTestingSetup : public TestingSetup {
     RegTestingSetup()
         : TestingSetup{CBaseChainParams::REGTEST} {}
+
+    CKey MakeNewKeyWithFastRandomContext();
 };
 
 class CBlock;
@@ -122,6 +124,8 @@ struct TestChain100Setup : public RegTestingSetup {
      */
     CBlock CreateAndProcessBlock(const std::vector<CMutableTransaction>& txns,
                                  const CScript& scriptPubKey);
+
+    CMutableTransaction CreateMempoolTransaction(CTransactionRef transaction_to_spend, CAmount amount_to_send = CAmount(1 * COIN));
 
     ~TestChain100Setup();
 
