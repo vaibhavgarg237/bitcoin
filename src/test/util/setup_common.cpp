@@ -76,10 +76,10 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::ve
     const std::vector<const char*> arguments = Cat(
         {
             "dummy",
-            "-printtoconsole=0",
+            "-printtoconsole=1",
             "-logtimemicros",
             "-logthreadnames",
-            "-debug",
+            "-debug=net",
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
         },

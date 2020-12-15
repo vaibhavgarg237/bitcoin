@@ -21,7 +21,11 @@
 static const std::vector<unsigned char> V_OP_TRUE{OP_TRUE};
 
 namespace validation_block_tests {
+// move most of this into shared util
 struct MinerTestingSetup : public RegTestingSetup {
+    // can I add the Block function to the RegTest setup,
+    // then have TestChain100Setup be templated to have the
+    // pubkey be changed without duplicating the code
     std::shared_ptr<CBlock> Block(const uint256& prev_hash);
     std::shared_ptr<const CBlock> GoodBlock(const uint256& prev_hash);
     std::shared_ptr<const CBlock> BadBlock(const uint256& prev_hash);
@@ -59,6 +63,8 @@ struct TestSubscriber final : public CValidationInterface {
     }
 };
 
+// this can be an easy to spend shared util
+// `mtx.vin[0].scriptWitness.stack.push_back(V_OP_TRUE);` < all that is needed to sign the transaction
 std::shared_ptr<CBlock> MinerTestingSetup::Block(const uint256& prev_hash)
 {
     static int i = 0;

@@ -106,8 +106,10 @@ std::string CTransaction::ToString() const
         vin.size(),
         vout.size(),
         nLockTime);
-    for (const auto& tx_in : vin)
+    for (const auto& tx_in : vin) {
         str += "    " + tx_in.ToString() + "\n";
+        str += " witness: " + tx_in.scriptWitness.ToString() + "\n";
+    }
     for (const auto& tx_in : vin)
         str += "    " + tx_in.scriptWitness.ToString() + "\n";
     for (const auto& tx_out : vout)
