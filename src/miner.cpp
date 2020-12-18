@@ -55,6 +55,7 @@ BlockAssembler::Options::Options() {
     blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
     nBlockMaxWeight = DEFAULT_BLOCK_MAX_WEIGHT;
     m_skip_inclusion_until = std::chrono::microseconds::max();
+    check_block_validity = true;
 }
 
 BlockAssembler::BlockAssembler(const CTxMemPool& mempool, const CChainParams& params, const Options& options)
@@ -65,6 +66,7 @@ BlockAssembler::BlockAssembler(const CTxMemPool& mempool, const CChainParams& pa
     // Limit weight to between 4K and MAX_BLOCK_WEIGHT-4K for sanity:
     nBlockMaxWeight = std::max<size_t>(4000, std::min<size_t>(MAX_BLOCK_WEIGHT - 4000, options.nBlockMaxWeight));
     m_skip_inclusion_until = options.m_skip_inclusion_until;
+    check_block_validity = options.check_block_validity;
 }
 
 static BlockAssembler::Options DefaultOptions()
@@ -81,6 +83,7 @@ static BlockAssembler::Options DefaultOptions()
     }
 
     options.m_skip_inclusion_until = std::chrono::microseconds::max();
+    options.check_block_validity = true;
     return options;
 }
 
@@ -181,7 +184,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
 
     BlockValidationState state;
-    if (!TestBlockValidity(state, chainparams, ::ChainstateActive(), *pblock, pindexPrev, false, false)) {
+    if (check_block_validity && !TestBlockValidity(state, chainparams, ::ChainstateActive(), *pblock, pindexPrev, false, false)) {
         throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, state.ToString()));
     }
     int64_t nTime2 = GetTimeMicros();
