@@ -25,7 +25,7 @@ std::vector<uint256> TxRebroadcastCalculator::GetRebroadcastTransactions(bool is
     CScript dummy_script = CScript();
 
     // Use CreateNewBlock to identify rebroadcast candidates
-    std::unique_ptr<CBlockTemplate> block_template = BlockAssembler(m_mempool, Params(), options).CreateNewBlock(dummy_script);
+    std::unique_ptr<CBlockTemplate> block_template = BlockAssembler(m_mempool, Params(), options).CreateNewBlock(dummy_script, /* check_block_validity */ false);
 
     LOCK(m_mempool.cs);
     for (const CTransactionRef& tx : block_template->block.vtx) {
