@@ -311,6 +311,43 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
     std::sort(sortedEntries.begin(), sortedEntries.end(), CompareTxIterByAncestorCount());
 }
 
+CFeeRate BlockAssembler::minTxFeeRate()
+{
+    int packages_selected = 0;
+    int descendants_updated = 0;
+    CFeeRate min_fee_rate = CFeeRate(COIN, 1);
+
+    resetBlock();
+    pblocktemplate.reset(new CBlockTemplate());
+
+    if (!pblocktemplate.get()) {
+        return min_fee_rate;
+    }
+    CBlock* block = &pblocktemplate->block;
+
+    // Add dummy coinbase tx as first transaction
+    block->vtx.emplace_back();
+    pblocktemplate->vTxFees.push_back(-1);
+    pblocktemplate->vTxSigOpsCost.push_back(-1);
+
+    CBlockIndex* prev_block_index = ::ChainActive().Tip();
+    assert(prev_block_index != nullptr);
+    nHeight = prev_block_index->nHeight + 1;
+
+    block->nTime = static_cast<uint32_t>(GetAdjustedTime());
+    const int64_t median_time_past = prev_block_index->GetMedianTimePast();
+
+    nLockTimeCutoff = median_time_past;
+    fIncludeWitness = IsWitnessEnabled(prev_block_index, chainparams.GetConsensus());
+
+    {
+        LOCK2(cs_main, m_mempool.cs);
+        addPackageTxs(packages_selected, descendants_updated, &min_fee_rate);
+    }
+
+    return min_fee_rate;
+}
+
 // This transaction selection algorithm orders the mempool based
 // on feerate of a transaction including all unconfirmed ancestors.
 // Since we don't remove transactions from the mempool as we select them
@@ -321,7 +358,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated)
+void BlockAssembler::addPackageTxs(int& nPackagesSelected, int& nDescendantsUpdated, CFeeRate* min_package_fee_rate)
 {
     // mapModifiedTx will store sorted packages after they are modified
     // because some of their txs are already in the block
@@ -432,6 +469,12 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
 
         // This transaction will make it in; reset the failed counter.
         nConsecutiveFailed = 0;
+
+        if (min_package_fee_rate) {
+            // Compare package fee rate and potentially update new minimum
+            CFeeRate newFeeRate(packageFees, packageSize);
+            if (newFeeRate < *min_package_fee_rate) *min_package_fee_rate = newFeeRate;
+        }
 
         // Package can be added. Sort the entries in a valid order.
         std::vector<CTxMemPool::txiter> sortedEntries;
