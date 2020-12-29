@@ -38,7 +38,11 @@ std::vector<uint256> TxRebroadcastCalculator::GetRebroadcastTransactions(bool is
         CTxMemPool::indexed_transaction_set::const_iterator it = is_wtxid ? m_mempool.get_iter_from_wtxid(txhsh) : m_mempool.mapTx.find(txhsh);
         if (it == m_mempool.mapTx.end()) continue;
 
-        rebroadcast_txs.push_back(txhsh);
+        // Compare transaction fee rate to cached value
+        CFeeRate fee_rate = CFeeRate(it->GetModifiedFee(), GetTransactionWeight(*tx));
+        if (fee_rate > m_cached_fee_rate) {
+            rebroadcast_txs.push_back(txhsh);
+        }
     }
 
     return rebroadcast_txs;

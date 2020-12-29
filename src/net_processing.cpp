@@ -4379,7 +4379,15 @@ bool PeerManager::SendMessages(CNode* pto)
                         // Don't rebroadcast if importing, reindex, or IBD to
                         // ensure we don't accidentally spam our peers with old
                         // transactions.
+                    } else if (::ChainActive().Tip() == m_txrebroadcast.m_tip_at_cache_time) {
+                        // If there has not been a block since the last cache
+                        // run, do not rebroadcast yet. Instead, skip the next
+                        // cache run, and attempt to rebroadcast again in 10
+                        // minutes.
+                        m_txrebroadcast.m_next_min_fee_cache += REBROADCAST_FEE_RATE_CACHE_INTERVAL;
+                        peer->m_next_rebroadcast_time = current_time + std::chrono::minutes{10};
                     } else {
+                        // Attempt to rebroadcast transactions
                         std::vector<uint256> rebroadcast_txs = m_txrebroadcast.GetRebroadcastTransactions(state.m_wtxid_relay);
 
                         // Add rebroadcast transactions to send queue
@@ -4392,6 +4400,7 @@ bool PeerManager::SendMessages(CNode* pto)
                 }
 
                 // Cache the min fee rate for a transaction to be included in a block.
+                // Applied as a rebroadcast filter above.
                 if (m_txrebroadcast.m_next_min_fee_cache < current_time) {
                     m_txrebroadcast.CacheMinRebroadcastFee();
                 }
