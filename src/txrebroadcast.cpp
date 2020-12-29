@@ -41,8 +41,25 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions(const std::s
     options.m_skip_inclusion_until = GetTime<std::chrono::microseconds>() - REBROADCAST_MIN_TX_AGE;
     options.m_check_block_validity = false;
 
-    // Use CreateNewBlock to identify rebroadcast candidates
+    // The fee rate condition only filters out transactions if it runs before
+    // we process the recently mined block. If the cache has since been
+    // updated, used the value from the previous run to filter transactions.
+    {
+        const CBlockIndex* tip = m_chainman.ActiveTip();
+        LOCK(m_rebroadcast_mutex);
+        if (m_tip_at_cache_time == tip) {
+            options.blockMinFeeRate = m_previous_cached_fee_rate;
+        } else {
+            options.blockMinFeeRate = m_cached_fee_rate;
+        }
+    }
+
+    // Skip if the fee rate cache has not yet run, which could happen once on
+    // startup
     std::vector<TxIds> rebroadcast_txs;
+    if (options.blockMinFeeRate.GetFeePerK() == CAmount(0)) return rebroadcast_txs;
+
+    // Use CreateNewBlock to identify rebroadcast candidates
     auto block_template = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams, options)
                               .CreateNewBlock(CScript());
     rebroadcast_txs.reserve(block_template->block.vtx.size());
@@ -54,4 +71,22 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions(const std::s
     }
 
     return rebroadcast_txs;
+};
+
+void TxRebroadcastHandler::CacheMinRebroadcastFee()
+{
+    CChainState& chain_state = m_chainman.ActiveChainstate();
+    if (chain_state.IsInitialBlockDownload()) return;
+    auto tip = m_chainman.ActiveTip();
+
+    // Calculate a new fee rate
+    BlockAssembler::Options options;
+    options.nBlockMaxWeight = REBROADCAST_WEIGHT_RATIO * MAX_BLOCK_WEIGHT;
+    const auto current_fee_rate = BlockAssembler(chain_state, m_mempool, m_chainparams, options).MinTxFeeRate();
+
+    // Update stored information
+    LOCK(m_rebroadcast_mutex);
+    m_tip_at_cache_time = tip;
+    m_previous_cached_fee_rate = m_cached_fee_rate;
+    m_cached_fee_rate = current_fee_rate;
 };
