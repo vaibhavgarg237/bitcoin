@@ -7,6 +7,7 @@
 
 #include <policy/feerate.h>
 #include <txmempool.h>
+#include <validation.h>
 
 struct TxIds {
     TxIds(uint256 txid, uint256 wtxid) : m_txid(txid), m_wtxid(wtxid) {}
@@ -25,10 +26,22 @@ public:
 
     std::vector<TxIds> GetRebroadcastTransactions();
 
+    /** Assemble a block from the highest fee rate packages in the local
+     *  mempool. Update the cache with the minimum fee rate for a package to be
+     *  included.
+     * */
+    void CacheMinRebroadcastFee();
+
 private:
     const CTxMemPool& m_mempool;
     const ChainstateManager& m_chainman;
     const CChainParams& m_chainparams;
+
+    /** Block at time of cache */
+    CBlockIndex* m_tip_at_cache_time{nullptr};
+
+    /** Minimum fee rate for package to be included in block */
+    CFeeRate m_cached_fee_rate;
 };
 
 #endif // BITCOIN_TXREBROADCAST_H

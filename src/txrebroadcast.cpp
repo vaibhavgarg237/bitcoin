@@ -8,6 +8,7 @@
 #include <script/script.h>
 #include <txrebroadcast.h>
 #include <util/time.h>
+#include <validation.h>
 
 /** We rebroadcast 3/4 of max block weight to reduce noise due to circumstances
  *  such as miners mining priority transactions. */
@@ -20,10 +21,15 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 {
     std::vector<TxIds> rebroadcast_txs;
 
+    // If the cache has run since we received the last block, the fee rate
+    // condition will not filter out any transactions, so skip this run.
+    if (m_tip_at_cache_time == m_chainman.ActiveTip()) return rebroadcast_txs;
+
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
     options.m_skip_inclusion_until = GetTime<std::chrono::microseconds>() - REBROADCAST_MIN_TX_AGE;
     options.m_check_block_validity = false;
+    options.blockMinFeeRate = m_cached_fee_rate;
 
     // Use CreateNewBlock to identify rebroadcast candidates
     auto block_template = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams, options)
@@ -36,4 +42,15 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
     }
 
     return rebroadcast_txs;
+};
+
+void TxRebroadcastHandler::CacheMinRebroadcastFee()
+{
+    if (m_chainman.ActiveChainstate().IsInitialBlockDownload()) return;
+
+    // Update stamp of chain tip on cache run
+    m_tip_at_cache_time = m_chainman.ActiveTip();
+
+    // Update cache fee rate
+    m_cached_fee_rate = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams).MinTxFeeRate();
 };
