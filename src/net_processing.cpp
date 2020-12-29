@@ -1132,6 +1132,7 @@ PeerManager::PeerManager(const CChainParams& chainparams, CConnman& connman, Ban
       m_banman(banman),
       m_chainman(chainman),
       m_mempool(pool),
+      m_txrebroadcast(m_mempool),
       m_stale_tip_check_time(0),
       m_ignore_incoming_txs(ignore_incoming_txs)
 {
@@ -4365,6 +4366,28 @@ bool PeerManager::SendMessages(CNode* pto)
                     } else {
                         // Use half the delay for outbound peers, as there is less privacy concern for them.
                         pto->m_tx_relay->nNextInvSend = PoissonNextSend(current_time, std::chrono::seconds{INVENTORY_BROADCAST_INTERVAL >> 1});
+                    }
+                }
+
+                // Check for rebroadcasts
+                PeerRef peer = GetPeerRef(pto->GetId());
+                if (peer->m_next_rebroadcast_time < current_time) {
+                    // Schedule next rebroadcast
+                    peer->m_next_rebroadcast_time = PoissonNextSend(current_time, TX_REBROADCAST_INTERVAL);
+
+                    if (::ChainstateActive().IsInitialBlockDownload() || ::fImporting || ::fReindex) {
+                        // Don't rebroadcast if importing, reindex, or IBD to
+                        // ensure we don't accidentally spam our peers with old
+                        // transactions.
+                    } else {
+                        std::vector<uint256> rebroadcast_txs = m_txrebroadcast.GetRebroadcastTransactions(state.m_wtxid_relay);
+
+                        // Add rebroadcast transactions to send queue
+                        // Since it is a set, duplicates will not be added
+                        auto size_before = pto->m_tx_relay->setInventoryTxToSend.size();
+                        pto->m_tx_relay->setInventoryTxToSend.insert(rebroadcast_txs.begin(), rebroadcast_txs.end());
+                        auto size_after = pto->m_tx_relay->setInventoryTxToSend.size();
+                        LogPrint(BCLog::NET, "Added %d rebroadcast transactions to setInventoryTxToSend for peer=%d\n", size_after - size_before, pto->GetId());
                     }
                 }
 

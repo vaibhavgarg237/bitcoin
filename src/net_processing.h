@@ -9,6 +9,7 @@
 #include <consensus/params.h>
 #include <net.h>
 #include <sync.h>
+#include <txrebroadcast.h>
 #include <txrequest.h>
 #include <validationinterface.h>
 
@@ -68,7 +69,16 @@ struct Peer {
     /** Work queue of items requested by this peer **/
     std::deque<CInv> m_getdata_requests GUARDED_BY(m_getdata_requests_mutex);
 
-    explicit Peer(NodeId id) : m_id(id) {}
+    /* Used for scheduling rebroadcasts */
+    std::chrono::microseconds m_next_rebroadcast_time{0};
+
+    explicit Peer(NodeId id) : m_id(id)
+    {
+        // Instead of immediately triggering the rebroadcast timer,
+        // intentionally schedule with some randomness
+        auto current_time = GetTime<std::chrono::microseconds>();
+        m_next_rebroadcast_time = PoissonNextSend(current_time, TX_REBROADCAST_INTERVAL);
+    }
 };
 
 using PeerRef = std::shared_ptr<Peer>;
@@ -200,6 +210,7 @@ private:
     ChainstateManager& m_chainman;
     CTxMemPool& m_mempool;
     TxRequestTracker m_txrequest GUARDED_BY(::cs_main);
+    TxRebroadcastCalculator m_txrebroadcast;
 
     int64_t m_stale_tip_check_time; //!< Next time to check for stale tip
 
