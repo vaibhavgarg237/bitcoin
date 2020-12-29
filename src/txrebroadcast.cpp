@@ -4,9 +4,12 @@
 
 #include <chainparams.h>
 #include <consensus/consensus.h>
+#include <consensus/validation.h>
 #include <miner.h>
+#include <policy/feerate.h>
 #include <script/script.h>
 #include <txrebroadcast.h>
+#include <validation.h>
 
 /** We rebroadcast 3/4 of max block weight to reduce noise due to circumstances
  *  such as miners mining priority transactions. */
@@ -39,4 +42,16 @@ std::vector<uint256> TxRebroadcastCalculator::GetRebroadcastTransactions(bool is
     }
 
     return rebroadcast_txs;
+}
+
+void TxRebroadcastCalculator::CacheMinRebroadcastFee()
+{
+    // Update time of next run
+    m_next_min_fee_cache = GetTime<std::chrono::seconds>() + REBROADCAST_FEE_RATE_CACHE_INTERVAL;
+
+    // Update stamp of chain tip on cache run
+    m_tip_at_cache_time = ::ChainActive().Tip();
+
+    // Update cache fee rate
+    m_cached_fee_rate = BlockAssembler(m_mempool, Params()).minTxFeeRate();
 }

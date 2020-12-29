@@ -4391,6 +4391,11 @@ bool PeerManager::SendMessages(CNode* pto)
                     }
                 }
 
+                // Cache the min fee rate for a transaction to be included in a block.
+                if (m_txrebroadcast.m_next_min_fee_cache < current_time) {
+                    m_txrebroadcast.CacheMinRebroadcastFee();
+                }
+
                 // Time to send but the peer has requested we not relay transactions.
                 if (fSendTrickle) {
                     LOCK(pto->m_tx_relay->cs_filter);
