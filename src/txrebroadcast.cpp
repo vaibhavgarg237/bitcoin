@@ -41,8 +41,24 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions(const std::s
     options.m_skip_inclusion_until = GetTime<std::chrono::microseconds>() - REBROADCAST_MIN_TX_AGE;
     options.m_check_block_validity = false;
 
-    // Use CreateNewBlock to identify rebroadcast candidates
+    // The fee rate condition only filters out transactions if it runs before
+    // we process the recently mined block. If the cache has since been
+    // updated, used the value from the previous run to filter transactions.
+    {
+        LOCK(m_rebroadcast_mutex);
+        if (m_tip_at_cache_time == m_chainman.ActiveTip()) {
+            options.blockMinFeeRate = m_previous_cached_fee_rate;
+        } else {
+            options.blockMinFeeRate = m_cached_fee_rate;
+        }
+    }
+
+    // Skip if the fee rate cache has not yet run, which could happen once on
+    // startup
     std::vector<TxIds> rebroadcast_txs;
+    if (options.blockMinFeeRate.GetFeePerK() == CAmount(0)) return rebroadcast_txs;
+
+    // Use CreateNewBlock to identify rebroadcast candidates
     auto block_template = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams, options)
                               .CreateNewBlock(CScript());
     rebroadcast_txs.reserve(block_template->block.vtx.size());
@@ -54,4 +70,20 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions(const std::s
     }
 
     return rebroadcast_txs;
+};
+
+void TxRebroadcastHandler::CacheMinRebroadcastFee()
+{
+    if (m_chainman.ActiveChainstate().IsInitialBlockDownload()) return;
+
+    LOCK(m_rebroadcast_mutex);
+
+    // Update stamp of chain tip on cache run
+    m_tip_at_cache_time = m_chainman.ActiveTip();
+
+    // Store the existing fee rate
+    m_previous_cached_fee_rate = m_cached_fee_rate;
+
+    // Calculate a new cached fee rate
+    m_cached_fee_rate = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams).MinTxFeeRate();
 };
