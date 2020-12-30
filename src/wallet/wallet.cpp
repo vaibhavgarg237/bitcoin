@@ -1240,7 +1240,6 @@ void CWallet::blockDisconnected(const CBlock& block, int height)
 
 void CWallet::updatedBlockTip()
 {
-    m_best_block_time = GetTime();
 }
 
 

@@ -638,8 +638,6 @@ private:
 
     std::chrono::milliseconds m_next_resend = std::chrono::milliseconds{0};
     bool fBroadcastTransactions = false;
-    // Local time that the tip block was received. Used to schedule wallet rebroadcasts.
-    std::atomic<int64_t> m_best_block_time {0};
 
     /**
      * Used to keep track of spent outpoints, and
