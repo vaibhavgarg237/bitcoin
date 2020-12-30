@@ -1238,11 +1238,6 @@ void CWallet::blockDisconnected(const CBlock& block, int height)
     }
 }
 
-void CWallet::updatedBlockTip()
-{
-}
-
-
 void CWallet::BlockUntilSyncedToCurrentChain() const {
     AssertLockNotHeld(cs_wallet);
     // Skip the queue-draining stuff if we know we're caught up with
