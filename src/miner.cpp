@@ -466,7 +466,7 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
         nConsecutiveFailed = 0;
 
         // Compare package fee rate and potentially update new minimum
-        CFeeRate newFeeRate(packageFees, packageSize * WITNESS_SCALE_FACTOR);
+        CFeeRate newFeeRate(packageFees, packageSize);
         if (newFeeRate < minPackageFeeRate) minPackageFeeRate = newFeeRate;
 
         // Package can be added. Sort the entries in a valid order.
