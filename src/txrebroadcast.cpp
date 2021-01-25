@@ -4,6 +4,7 @@
 
 #include <chainparams.h>
 #include <consensus/consensus.h>
+#include <logging.h>
 #include <miner.h>
 #include <script/script.h>
 #include <txrebroadcast.h>
@@ -92,6 +93,7 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
     // Use CreateNewBlock to identify rebroadcast candidates
     auto block_template = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams, options)
                               .CreateNewBlock(CScript());
+    auto after_cnb_time = GetTime<std::chrono::microseconds>();
 
     for (const CTransactionRef& tx : block_template->block.vtx) {
         if (tx->IsCoinBase()) continue;
@@ -133,6 +135,15 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 
     TrimMaxRebroadcast();
 
+    auto delta1 = after_cnb_time - start_time;
+    auto delta2 = GetTime<std::chrono::microseconds>() - start_time;
+    LogPrint(BCLog::BENCH, "GetRebroadcastTransactions(): %d us total, %d us spent in CreateNewBlock.\n", delta2.count(), delta1.count());
+    LogPrint(BCLog::NET, "Queued %d transactions for attempted rebroadcast, filtered from %d candidates with cached fee rate of %s.\n", rebroadcast_txs.size(), block_template->block.vtx.size() - 1, m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB));
+
+    for (TxIds ids : rebroadcast_txs) {
+        LogPrint(BCLog::NET, "Attempting to rebroadcast txid: %s, wtxid: %s\n", ids.m_txid.ToString(), ids.m_wtxid.ToString());
+    }
+
     return rebroadcast_txs;
 };
 
@@ -144,7 +155,10 @@ void TxRebroadcastHandler::CacheMinRebroadcastFee()
     m_tip_at_cache_time = m_chainman.ActiveTip();
 
     // Update cache fee rate
+    auto start_time = GetTime<std::chrono::microseconds>();
     m_cached_fee_rate = BlockAssembler(m_chainman.ActiveChainstate(), m_mempool, m_chainparams).MinTxFeeRate();
+    auto delta_time = GetTime<std::chrono::microseconds>() - start_time;
+    LogPrint(BCLog::BENCH, "Caching minimum fee for rebroadcast to %s, took %d us to calculate.\n", m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB), delta_time.count());
 };
 
 void TxRebroadcastHandler::TrimMaxRebroadcast()
