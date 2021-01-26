@@ -16,13 +16,13 @@ struct TxIds {
     const uint256 m_wtxid;
 };
 
+class indexed_rebroadcast_set;
+
 class TxRebroadcastHandler
 {
 public:
-    TxRebroadcastHandler(const CTxMemPool& mempool, const ChainstateManager& chainman, const CChainParams& chainparams)
-        : m_mempool(mempool),
-          m_chainman(chainman),
-          m_chainparams(chainparams){};
+    TxRebroadcastHandler(const CTxMemPool& mempool, const ChainstateManager& chainman, const CChainParams& chainparams);
+    ~TxRebroadcastHandler();
 
     std::vector<TxIds> GetRebroadcastTransactions();
 
@@ -42,6 +42,9 @@ private:
 
     /** Minimum fee rate for package to be included in block */
     CFeeRate m_cached_fee_rate;
+
+    /** Keep track of previous rebroadcast attempts */
+    std::unique_ptr<indexed_rebroadcast_set> m_attempt_tracker;
 };
 
 #endif // BITCOIN_TXREBROADCAST_H
