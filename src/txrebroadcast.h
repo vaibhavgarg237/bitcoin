@@ -48,6 +48,9 @@ private:
 
     /** Keep track of previous rebroadcast attempts */
     std::unique_ptr<indexed_rebroadcast_set> m_attempt_tracker;
+
+    /** Limit the size of m_attempt_tracker by deleting the oldest entries */
+    void TrimMaxRebroadcast();
 };
 
 #endif // BITCOIN_TXREBROADCAST_H
