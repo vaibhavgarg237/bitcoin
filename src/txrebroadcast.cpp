@@ -23,6 +23,12 @@ static constexpr int MAX_REBROADCAST_COUNT = 6;
  * rebroadcast */
 static constexpr std::chrono::hours MIN_REATTEMPT_INTERVAL = 4h;
 
+/** The maximum number of entries permitted in m_attempt_tracker */
+static constexpr int MAX_ENTRIES = 500;
+
+/** The maximum age of an entry ~3 months */
+static constexpr std::chrono::hours MAX_ENTRY_AGE = std::chrono::hours(3 * 30 * 24);
+
 std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 {
     std::vector<TxIds> rebroadcast_txs;
@@ -74,6 +80,8 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
         rebroadcast_txs.push_back(TxIds(txid, wtxid));
     }
 
+    TrimMaxRebroadcast();
+
     return rebroadcast_txs;
 };
 
@@ -94,4 +102,25 @@ void TxRebroadcastHandler::RecordAttempt(indexed_rebroadcast_set::index<index_by
     };
 
     m_attempt_tracker.modify(entry_it, UpdateRebroadcastEntry);
+};
+
+void TxRebroadcastHandler::TrimMaxRebroadcast()
+{
+    // Delete any entries that are older than MAX_ENTRY_AGE
+    std::chrono::microseconds min_age = GetTime<std::chrono::microseconds>() - MAX_ENTRY_AGE;
+
+    while (!m_attempt_tracker.empty()) {
+        auto it = m_attempt_tracker.get<index_by_last_attempt>().begin();
+        if (it->m_last_attempt < min_age) {
+            m_attempt_tracker.get<index_by_last_attempt>().erase(it);
+        } else {
+            break;
+        }
+    }
+
+    // If there are still too many entries, delete the oldest ones
+    while (m_attempt_tracker.size() > MAX_ENTRIES) {
+        auto it = m_attempt_tracker.get<index_by_last_attempt>().begin();
+        m_attempt_tracker.get<index_by_last_attempt>().erase(it);
+    }
 };
