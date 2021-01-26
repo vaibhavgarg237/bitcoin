@@ -86,6 +86,9 @@ private:
 
     /** Update an existing RebroadcastEntry - increment count and update timestamp */
     void RecordAttempt(indexed_rebroadcast_set::index<index_by_wtxid>::type::iterator& entry_it);
+
+    /** Limit the size of m_attempt_tracker by deleting the oldest entries */
+    void TrimMaxRebroadcast();
 };
 
 #endif // BITCOIN_TXREBROADCAST_H
