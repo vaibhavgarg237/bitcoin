@@ -8,6 +8,13 @@
 #include <policy/feerate.h>
 #include <tuple>
 #include <txmempool.h>
+#include <util/hasher.h>
+#include <util/time.h>
+
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/member.hpp>
 
 struct TxIds
 {
@@ -16,6 +23,38 @@ struct TxIds
     const uint256 m_txid;
     const uint256 m_wtxid;
 };
+
+struct RebroadcastEntry
+{
+    RebroadcastEntry(std::chrono::microseconds now_time, uint256 wtxid)
+        : m_last_attempt(now_time),
+          m_wtxid(wtxid),
+          m_count(1) {}
+
+    std::chrono::microseconds m_last_attempt;
+    const uint256 m_wtxid;
+    int m_count;
+};
+
+/** Used for multi_index tag  */
+struct index_by_last_attempt {};
+
+using indexed_rebroadcast_set = boost::multi_index_container<
+    RebroadcastEntry,
+    boost::multi_index::indexed_by<
+        // sorted by wtxid
+        boost::multi_index::hashed_unique<
+            boost::multi_index::tag<index_by_wtxid>,
+            boost::multi_index::member<RebroadcastEntry, const uint256, &RebroadcastEntry::m_wtxid>,
+            SaltedTxidHasher
+        >,
+        // sorted by last rebroadcast time
+        boost::multi_index::ordered_non_unique<
+            boost::multi_index::tag<index_by_last_attempt>,
+            boost::multi_index::member<RebroadcastEntry, std::chrono::microseconds, &RebroadcastEntry::m_last_attempt>
+        >
+    >
+>;
 
 class TxRebroadcastHandler
 {
@@ -38,6 +77,12 @@ private:
 
     /** Minimum fee rate for package to be included in block */
     CFeeRate m_cached_fee_rate;
+
+    /** Keep track of previous rebroadcast attempts */
+    indexed_rebroadcast_set m_attempt_tracker;
+
+    /** Update an existing RebroadcastEntry - increment count and update timestamp */
+    void RecordAttempt(indexed_rebroadcast_set::index<index_by_wtxid>::type::iterator& entry_it);
 };
 
 #endif // BITCOIN_TXREBROADCAST_H
