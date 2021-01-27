@@ -70,14 +70,7 @@ public:
      * */
     void CacheMinRebroadcastFee();
 
-private:
-    const CTxMemPool& m_mempool;
-
-    const ChainstateManager& m_chainman;
-
-    /** Block at time of cache */
-    CBlockIndex* m_tip_at_cache_time{nullptr};
-
+protected:
     /** Minimum fee rate for package to be included in block */
     CFeeRate m_cached_fee_rate;
 
@@ -86,6 +79,14 @@ private:
 
     /** Update an existing RebroadcastEntry - increment count and update timestamp */
     void RecordAttempt(indexed_rebroadcast_set::index<index_by_wtxid>::type::iterator& entry_it);
+
+private:
+    const CTxMemPool& m_mempool;
+
+    const ChainstateManager& m_chainman;
+
+    /** Block at time of cache */
+    CBlockIndex* m_tip_at_cache_time{nullptr};
 
     /** Limit the size of m_attempt_tracker by deleting the oldest entries */
     void TrimMaxRebroadcast();
