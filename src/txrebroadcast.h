@@ -38,6 +38,12 @@ public:
     /** Remove transaction entry from the attempt tracker.*/
     void RemoveFromAttemptTracker(const CTransactionRef& tx);
 
+    /** Test only */
+    void UpdateAttempt(const uint256& wtxid, const int count, const std::chrono::microseconds last_attempt_time);
+
+    /** Test only */
+    bool CheckRecordedAttempt(const uint256& wtxid, const int expected_count, const std::chrono::microseconds expected_timestamp) const;
+
 private:
     const CTxMemPool& m_mempool;
     const ChainstateManager& m_chainman;

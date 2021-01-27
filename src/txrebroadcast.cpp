@@ -187,3 +187,27 @@ void TxRebroadcastHandler::TrimMaxRebroadcast()
         m_attempt_tracker->get<index_by_last_attempt>().erase(it);
     }
 };
+
+void TxRebroadcastHandler::UpdateAttempt(const uint256& wtxid, const int count, const std::chrono::microseconds last_attempt_time)
+{
+    auto it = m_attempt_tracker->find(wtxid);
+    auto UpdateRebroadcastEntry = [last_attempt_time, count](RebroadcastEntry& rebroadcast_entry) {
+        rebroadcast_entry.m_last_attempt = last_attempt_time;
+        rebroadcast_entry.m_count += count;
+    };
+
+    m_attempt_tracker->modify(it, UpdateRebroadcastEntry);
+};
+
+bool TxRebroadcastHandler::CheckRecordedAttempt(const uint256& wtxid, const int expected_count, const std::chrono::microseconds expected_timestamp) const
+{
+    const auto it = m_attempt_tracker->find(wtxid);
+    if (it == m_attempt_tracker->end()) return false;
+    if (it->m_count != expected_count) return false;
+
+    // Check the recorded timestamp is within 2 seconds of the param passed in
+    std::chrono::microseconds delta = expected_timestamp - it->m_last_attempt;
+    if (delta.count() > 2) return false;
+
+    return true;
+};
