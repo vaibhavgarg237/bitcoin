@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <amount.h>
 #include <boost/test/unit_test.hpp>
 #include <clientversion.h>
 #include <consensus/tx_check.h>
@@ -54,6 +55,11 @@ public:
 
         m_attempt_tracker.modify(entry_it, UpdateRebroadcastEntry);
     };
+
+    void UpdateCachedFeeRate(CFeeRate new_fee_rate)
+    {
+        m_cached_fee_rate = new_fee_rate;
+    }
 };
 
 BOOST_FIXTURE_TEST_SUITE(txrebroadcast_tests, TestChain100Setup)
@@ -91,6 +97,46 @@ BOOST_AUTO_TEST_CASE(recency)
     BOOST_CHECK_EQUAL(candidates.front().m_txid, tx_old.GetHash());
 }
 
+BOOST_AUTO_TEST_CASE(fee_rate)
+{
+    // Since the test chain comes with 100 blocks, the first coinbase is
+    // already valid to spend. Generate another block to have two valid
+    // coinbase inputs to spend.
+    CreateAndProcessBlock(std::vector<CMutableTransaction>(), CScript());
+
+    // Instantiate rebroadcast module & mine a block, so when we run
+    // GetRebroadcastTransactions, Chain tip will be beyond m_tip_at_cache_time
+    TxRebroadcastHandlerTest tx_rebroadcast(*m_node.mempool, *m_node.chainman);
+    CreateAndProcessBlock(std::vector<CMutableTransaction>(), CScript());
+
+    // Update m_cached_fee_rate
+    // The transactions created in this test are each 157 bytes, and they set
+    // the fee at 1 BTC and 2 BTC.
+    CFeeRate cached_fee_rate(1.5 * COIN, 157);
+    tx_rebroadcast.UpdateCachedFeeRate(cached_fee_rate);
+
+    // Create two transactions
+    CKey key;
+    key.MakeNewKey(true);
+    CScript output_destination = GetScriptForDestination(PKHash(key.GetPubKey()));
+
+    // - One with a low fee rate
+    CMutableTransaction tx_low = CreateValidMempoolTransaction(m_coinbase_txns[0], /* vout */ 0, /* input_height */ 0, coinbaseKey, output_destination, CAmount(49 * COIN));
+    // - One with a high fee rate
+    CMutableTransaction tx_high = CreateValidMempoolTransaction(m_coinbase_txns[1], /* vout */ 0, /* input_height */ 1, coinbaseKey, output_destination, CAmount(48 * COIN));
+
+    // Confirm both transactions successfully made it into the mempool
+    BOOST_CHECK_EQUAL(m_node.mempool->size(), 2);
+
+    // Age transaction to be older than REBROADCAST_MIN_TX_AGE
+    SetMockTime(GetTime<std::chrono::seconds>() + 35min);
+
+    // Check that only the high fee rate transaction would be selected
+    std::vector<TxIds> candidates = tx_rebroadcast.GetRebroadcastTransactions();
+    BOOST_REQUIRE_EQUAL(candidates.size(), 1);
+    BOOST_CHECK_EQUAL(candidates.front().m_txid, tx_high.GetHash());
+}
+
 BOOST_AUTO_TEST_CASE(max_rebroadcast)
 {
     // Create a transaction
@@ -112,7 +158,7 @@ BOOST_AUTO_TEST_CASE(max_rebroadcast)
 
     // Check that the transaction gets returned to rebroadcast
     std::vector<TxIds> candidates = tx_rebroadcast.GetRebroadcastTransactions();
-    BOOST_CHECK_EQUAL(candidates.size(), 1);
+    BOOST_REQUIRE_EQUAL(candidates.size(), 1);
     BOOST_CHECK_EQUAL(candidates.front().m_txid, txhsh);
 
     // Check if transaction was properly added to m_attempt_tracker
@@ -130,7 +176,7 @@ BOOST_AUTO_TEST_CASE(max_rebroadcast)
     SetMockTime(current_time);
     // Then check that it gets returned for rebroadacst
     candidates = tx_rebroadcast.GetRebroadcastTransactions();
-    BOOST_CHECK_EQUAL(candidates.size(), 1);
+    BOOST_REQUIRE_EQUAL(candidates.size(), 1);
     // And that m_attempt_tracker is properly updated
     BOOST_CHECK(tx_rebroadcast.CheckRecordedAttempt(txhsh, 2, current_time));
 
