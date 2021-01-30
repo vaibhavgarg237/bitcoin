@@ -211,3 +211,9 @@ bool TxRebroadcastHandler::CheckRecordedAttempt(const uint256& wtxid, const int 
 
     return true;
 };
+
+void TxRebroadcastHandler::UpdateCachedFeeRate(const CFeeRate& new_fee_rate)
+{
+    m_cached_fee_rate = new_fee_rate;
+};
+

@@ -44,6 +44,9 @@ public:
     /** Test only */
     bool CheckRecordedAttempt(const uint256& wtxid, const int expected_count, const std::chrono::microseconds expected_timestamp) const;
 
+    /** Test only */
+    void UpdateCachedFeeRate(const CFeeRate& new_fee_rate);
+
 private:
     const CTxMemPool& m_mempool;
     const ChainstateManager& m_chainman;
