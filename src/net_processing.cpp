@@ -489,6 +489,14 @@ private:
     void ProcessGetCFilters(CNode& peer, CDataStream& vRecv);
     void ProcessGetCFHeaders(CNode& peer, CDataStream& vRecv);
     void ProcessGetCFCheckPt(CNode& peer, CDataStream& vRecv);
+
+    /** Checks if address relay is permitted with peer. Initializes
+     * `m_addr_known` bloom filter if needed.
+     *
+     *  @return   True if address relay is enabled with peer
+     *            False if address relay is disallowed
+     */
+    bool SetupAddressRelay(CNode& pfrom) const;
 };
 } // namespace
 
@@ -4159,6 +4167,19 @@ public:
         return mp->CompareDepthAndScore(*b, *a, m_wtxid_relay);
     }
 };
+}
+
+bool PeerManagerImpl::SetupAddressRelay(CNode& pfrom) const
+{
+    if (pfrom.IsBlockOnlyConn()) return false;
+
+    if (pfrom.m_addr_known == nullptr) {
+        // First addr message we have received from the peer, initialize
+        // m_addr_known
+        pfrom.m_addr_known = std::make_unique<CRollingBloomFilter>(5000, 0.001);
+    }
+
+    return true;
 }
 
 bool PeerManagerImpl::SendMessages(CNode* pto)
