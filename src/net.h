@@ -275,6 +275,7 @@ public:
     Network m_network;
     uint32_t m_mapped_as;
     ConnectionType m_conn_type;
+    bool addr_relay_enabled;
 };
 
 

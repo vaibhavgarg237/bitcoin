@@ -611,6 +611,8 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
     stats.addrLocal = addrLocalUnlocked.IsValid() ? addrLocalUnlocked.ToString() : "";
 
     X(m_conn_type);
+
+    stats.addr_relay_enabled = RelayAddrsWithConn();
 }
 #undef X
 
