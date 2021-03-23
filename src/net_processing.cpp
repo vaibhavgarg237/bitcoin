@@ -2436,6 +2436,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         UpdatePreferredDownload(pfrom, State(pfrom.GetId()));
         }
 
+        // Self advertisement logic
         if (!pfrom.IsInboundConn() && !pfrom.IsBlockOnlyConn()) {
             // For outbound peers, we try to relay our address (so that other
             // nodes can try to find us more quickly, as we have no guarantee
@@ -2445,8 +2446,9 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             // empty and no one will know who we are, so these mechanisms are
             // important to help us connect to the network.
             //
-            // We skip this for block-relay-only peers to avoid potentially leaking
-            // information about our block-relay-only connections via address relay.
+            // We skip this for block-relay-only peers. We want to avoid
+            // potentially leaking addr information and we do not want to
+            // indicate to the peer that we will participate in addr relay.
             if (fListen && !m_chainman.ActiveChainstate().IsInitialBlockDownload())
             {
                 CAddress addr = GetLocalAddress(&pfrom.addr, pfrom.GetLocalServices());
@@ -4222,6 +4224,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
         // Address refresh broadcast
         auto current_time = GetTime<std::chrono::microseconds>();
 
+        // Self advertisement logic
         if (fListen && pto->RelayAddrsWithConn() &&
             !m_chainman.ActiveChainstate().IsInitialBlockDownload() &&
             pto->m_next_local_addr_send < current_time) {
@@ -4259,8 +4262,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
                 make_flags = 0;
             }
 
-            for (const CAddress& addr : pto->vAddrToSend)
-            {
+            for (const CAddress& addr : pto->vAddrToSend) {
                 if (pto->m_addr_known) {
                     if (pto->m_addr_known->contains(addr.GetKey())) continue;
                     pto->AddAddressKnown(addr);
@@ -4273,12 +4275,17 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
                     vAddr.clear();
                 }
             }
+
             pto->vAddrToSend.clear();
-            if (!vAddr.empty())
+
+            if (!vAddr.empty()) {
                 m_connman.PushMessage(pto, msgMaker.Make(make_flags, msg_type, vAddr));
-            // we only send the big addr message once
-            if (pto->vAddrToSend.capacity() > 40)
+            }
+
+            if (pto->vAddrToSend.capacity() > 40) {
+                // we only send the big addr message once
                 pto->vAddrToSend.shrink_to_fit();
+            }
         }
 
         // Start block sync
