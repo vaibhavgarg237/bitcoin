@@ -543,6 +543,20 @@ public:
 
     // flood relay
     std::vector<CAddress> vAddrToSend;
+
+    /** Bloom filter to track recent addr messages relayed with this peer.
+     *
+     *  We initialize this filter for outbound peers (other than
+     *  block-relay-only connections) or when an inbound peer sends us an
+     *  address related message (ADDR, ADDRV2, GETADDR, SENDADDRV2).
+     *
+     *  We use the presence of this filter to decide whether a peer is eligible
+     *  for trickle relay of addr messages. This avoids relaying to peers that
+     *  are unlikely to forward them, effectively blackholing self
+     *  announcements. Reasons peers might not support addr relay on the link
+     *  is if they connected to us as a block-relay-only peer or as a light
+     *  client.
+     * */
     std::unique_ptr<CRollingBloomFilter> m_addr_known{nullptr};
     bool fGetAddr{false};
     std::chrono::microseconds m_next_addr_send GUARDED_BY(cs_sendProcessing){0};
