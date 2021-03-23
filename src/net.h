@@ -503,13 +503,10 @@ public:
         return m_conn_type == ConnectionType::INBOUND;
     }
 
-    /* Whether we send addr messages over this connection */
+    /* Whether we have established addr relay with this connection */
     bool RelayAddrsWithConn() const
     {
-        // Don't relay addr messages to peers that we connect to as block-relay-only
-        // peers (to prevent adversaries from inferring these links from addr
-        // traffic).
-        return m_conn_type != ConnectionType::BLOCK_RELAY;
+        return m_addr_known != nullptr;
     }
 
     bool ExpectServicesFromConn() const {
@@ -546,6 +543,20 @@ public:
 
     // flood relay
     std::vector<CAddress> vAddrToSend;
+
+    /** Bloom filter to track recent addr messages relayed with this peer.
+     *
+     *  We initialize this filter when a peer sends us an address related
+     *  message (ADDR, ADDRV2, GETADDR, SENDADDRV2), except for outbound
+     *  block-relay-only connections.
+     *
+     *  We use the presence of this filter to decide whether a peer is eligible
+     *  for trickle relay of addr messages. This avoids relaying to peers that
+     *  are unlikely to forward them, effectively blackholing self
+     *  announcements. Reasons peers might not support addr relay on the link
+     *  is if they connected to us as a block-relay-only peer, or as a light
+     *  client.
+     * */
     std::unique_ptr<CRollingBloomFilter> m_addr_known{nullptr};
     bool fGetAddr{false};
     std::chrono::microseconds m_next_addr_send GUARDED_BY(cs_sendProcessing){0};
@@ -676,8 +687,9 @@ public:
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
         // after addresses were pushed.
-        assert(m_addr_known);
-        if (_addr.IsValid() && !m_addr_known->contains(_addr.GetKey()) && IsAddrCompatible(_addr)) {
+        if (m_addr_known && m_addr_known->contains(_addr.GetKey())) return;
+
+        if (_addr.IsValid() && IsAddrCompatible(_addr)) {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND) {
                 vAddrToSend[insecure_rand.randrange(vAddrToSend.size())] = _addr;
             } else {

@@ -2645,10 +2645,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
 
         s >> vAddr;
 
-        if (!pfrom.RelayAddrsWithConn()) {
-            LogPrint(BCLog::NET, "ignoring %s message from %s peer=%d\n", msg_type, pfrom.ConnectionTypeAsString(), pfrom.GetId());
-            return;
-        }
+        if (!SetupAddressRelay(pfrom, msg_type)) return;
+
         if (vAddr.size() > MAX_ADDR_TO_SEND)
         {
             Misbehaving(pfrom.GetId(), 20, strprintf("%s message size = %u", msg_type, vAddr.size()));
@@ -3577,6 +3575,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
         pfrom.fSentAddr = true;
 
+        SetupAddressRelay(pfrom, msg_type);
+
         pfrom.vAddrToSend.clear();
         std::vector<CAddress> vAddr;
         if (pfrom.HasPermission(PF_ADDR)) {
@@ -4240,11 +4240,10 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
         //
         // Message: addr
         //
-        if (pto->RelayAddrsWithConn() && pto->m_next_addr_send < current_time) {
+        if (pto->m_next_addr_send < current_time && pto->vAddrToSend.size() != 0 && !pto->IsBlockOnlyConn()) {
             pto->m_next_addr_send = PoissonNextSend(current_time, AVG_ADDRESS_BROADCAST_INTERVAL);
             std::vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
-            assert(pto->m_addr_known);
 
             const char* msg_type;
             int make_flags;
@@ -4258,16 +4257,16 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
             for (const CAddress& addr : pto->vAddrToSend)
             {
-                if (!pto->m_addr_known->contains(addr.GetKey()))
-                {
-                    pto->m_addr_known->insert(addr.GetKey());
-                    vAddr.push_back(addr);
-                    // receiver rejects addr messages larger than MAX_ADDR_TO_SEND
-                    if (vAddr.size() >= MAX_ADDR_TO_SEND)
-                    {
-                        m_connman.PushMessage(pto, msgMaker.Make(make_flags, msg_type, vAddr));
-                        vAddr.clear();
-                    }
+                if (pto->m_addr_known) {
+                    if (pto->m_addr_known->contains(addr.GetKey())) continue;
+                    pto->AddAddressKnown(addr);
+                }
+
+                vAddr.push_back(addr);
+                // receiver rejects addr messages larger than MAX_ADDR_TO_SEND
+                if (vAddr.size() >= MAX_ADDR_TO_SEND) {
+                    m_connman.PushMessage(pto, msgMaker.Make(make_flags, msg_type, vAddr));
+                    vAddr.clear();
                 }
             }
             pto->vAddrToSend.clear();
