@@ -2623,7 +2623,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             pfrom.fDisconnect = true;
             return;
         }
-        pfrom.m_wants_addrv2 = true;
+
+        if (SetupAddressRelay(pfrom)) {
+            pfrom.m_wants_addrv2 = true;
+        }
+
         return;
     }
 
