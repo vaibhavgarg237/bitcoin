@@ -2436,7 +2436,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         UpdatePreferredDownload(pfrom, State(pfrom.GetId()));
         }
 
-        if (!pfrom.IsInboundConn() && !pfrom.IsBlockOnlyConn()) {
+        if (!pfrom.IsInboundConn() && SetupAddressRelay(pfrom)) {
             // For outbound peers, we try to relay our address (so that other
             // nodes can try to find us more quickly, as we have no guarantee
             // that an outbound peer is even aware of how to reach us) and do a
@@ -2645,10 +2645,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
 
         s >> vAddr;
 
-        if (!pfrom.RelayAddrsWithConn()) {
+        if (!SetupAddressRelay(pfrom)) {
             LogPrint(BCLog::NET, "ignoring %s message from %s peer=%d\n", msg_type, pfrom.ConnectionTypeAsString(), pfrom.GetId());
             return;
         }
+
         if (vAddr.size() > MAX_ADDR_TO_SEND)
         {
             Misbehaving(pfrom.GetId(), 20, strprintf("%s message size = %u", msg_type, vAddr.size()));
@@ -3577,6 +3578,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
         pfrom.fSentAddr = true;
 
+        SetupAddressRelay(pfrom);
+
         pfrom.vAddrToSend.clear();
         std::vector<CAddress> vAddr;
         if (pfrom.HasPermission(PF_ADDR)) {
@@ -4171,6 +4174,9 @@ public:
 
 bool PeerManagerImpl::SetupAddressRelay(CNode& pfrom) const
 {
+    // Don't relay addr messages to peers that we connect to as
+    // block-relay-only peers (to prevent adversaries from inferring these
+    // links from addr traffic).
     if (pfrom.IsBlockOnlyConn()) return false;
 
     if (pfrom.m_addr_known == nullptr) {
