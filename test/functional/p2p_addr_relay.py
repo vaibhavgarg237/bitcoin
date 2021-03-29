@@ -32,6 +32,19 @@ class AddrReceiver(P2PInterface):
             self.num_ipv4_received += 1
 
 
+class AddrBlackhole(P2PInterface):
+    """ Does not initiate any addr related messages """
+    num_ipv4_received = 0
+
+    def on_version(self, message):
+        self.send_message(msg_verack())
+        self.nServices = message.nServices
+
+    def on_addr(self, message):
+        for addr in message.addrs:
+            self.num_ipv4_received += 1
+
+
 class AddrTest(BitcoinTestFramework):
     counter = 0
     mocktime = int(time.time())
@@ -42,6 +55,7 @@ class AddrTest(BitcoinTestFramework):
     def run_test(self):
         self.oversized_addr_test()
         self.relay_tests()
+        self.inbound_blackhole_tests()
 
     def setup_addr_msg(self, num):
         addrs = []
@@ -98,6 +112,25 @@ class AddrTest(BitcoinTestFramework):
         # originating node (addr_source).
         ipv4_branching_factor = 2
         assert_equal(total_ipv4_received, num_ipv4_addrs * ipv4_branching_factor)
+
+        self.nodes[0].disconnect_p2ps()
+
+    def inbound_blackhole_tests(self):
+        self.log.info('Check that we only relay addresses to inbound peers who have previously sent us addr related messages')
+
+        addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
+        receiver_peer = self.nodes[0].add_p2p_connection(AddrReceiver())
+        blackhole_peer = self.nodes[0].add_p2p_connection(AddrBlackhole())
+
+        msg = self.setup_addr_msg(2)
+        addr_source.send_and_ping(msg)
+        self.mocktime += 30 * 60
+        self.nodes[0].setmocktime(self.mocktime)
+        receiver_peer.sync_with_ping()
+        blackhole_peer.sync_with_ping()
+
+        assert_equal(receiver_peer.num_ipv4_received, 2)
+        assert_equal(blackhole_peer.num_ipv4_received, 0)
 
         self.nodes[0].disconnect_p2ps()
 
