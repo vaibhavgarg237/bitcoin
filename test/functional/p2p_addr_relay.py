@@ -72,6 +72,14 @@ class AddrTest(BitcoinTestFramework):
         msg.addrs = addrs
         return msg
 
+    def send_addr_msg(self, source, msg, receivers):
+        source.send_and_ping(msg)
+        # pop m_next_addr_send timer
+        self.mocktime += 30 * 60
+        self.nodes[0].setmocktime(self.mocktime)
+        for peer in receivers:
+            peer.sync_with_ping()
+
     def oversized_addr_test(self):
         self.log.info('Send an addr message that is too large')
         addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
@@ -100,11 +108,7 @@ class AddrTest(BitcoinTestFramework):
                 'received: addr (301 bytes) peer=1',
             ]
         ):
-            addr_source.send_and_ping(msg)
-            self.mocktime += 30 * 60
-            self.nodes[0].setmocktime(self.mocktime)
-            for receiver in receivers:
-                receiver.sync_with_ping()
+            self.send_addr_msg(addr_source, msg, receivers)
 
         total_ipv4_received = sum(r.num_ipv4_received for r in receivers)
 
@@ -123,11 +127,7 @@ class AddrTest(BitcoinTestFramework):
         blackhole_peer = self.nodes[0].add_p2p_connection(AddrBlackhole())
 
         msg = self.setup_addr_msg(2)
-        addr_source.send_and_ping(msg)
-        self.mocktime += 30 * 60
-        self.nodes[0].setmocktime(self.mocktime)
-        receiver_peer.sync_with_ping()
-        blackhole_peer.sync_with_ping()
+        self.send_addr_msg(addr_source, msg, [receiver_peer, blackhole_peer])
 
         assert_equal(receiver_peer.num_ipv4_received, 2)
         assert_equal(blackhole_peer.num_ipv4_received, 0)
