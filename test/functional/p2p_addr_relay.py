@@ -47,6 +47,7 @@ class AddrBlackhole(P2PInterface):
 
 class AddrTest(BitcoinTestFramework):
     counter = 0
+    mocktime = int(time.time())
 
     def set_test_params(self):
         self.num_nodes = 1
@@ -56,13 +57,11 @@ class AddrTest(BitcoinTestFramework):
         self.relay_tests()
         self.blackhole_tests()
 
-    def setup_addr_msg(self, num, add_delay=False):
+    def setup_addr_msg(self, num):
         addrs = []
         for i in range(num):
             addr = CAddress()
-            addr.time = int(time.time()) + i
-            if add_delay:
-                addr.time += 1800
+            addr.time = self.mocktime + i
             addr.nServices = NODE_NETWORK | NODE_WITNESS
             addr.ip = "123.123.123.{}".format(self.counter % 256)
             addr.port = 8333 + i
@@ -102,7 +101,8 @@ class AddrTest(BitcoinTestFramework):
             ]
         ):
             addr_source.send_and_ping(msg)
-            self.nodes[0].setmocktime(int(time.time()) + 30 * 60)
+            self.mocktime += 30 * 60
+            self.nodes[0].setmocktime(self.mocktime)
             for receiver in receivers:
                 receiver.sync_with_ping()
 
@@ -116,16 +116,17 @@ class AddrTest(BitcoinTestFramework):
         self.nodes[0].disconnect_p2ps()
 
     def blackhole_tests(self):
-        self.log.info('Check that we only relay addresses to peers who have previously sent us addr related messages')
+        self.log.info('Check that we only relay addresses to inbound peers who have previously sent us addr related messages')
 
         addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
         receiver_peer = self.nodes[0].add_p2p_connection(AddrReceiver())
         blackhole_peer = self.nodes[0].add_p2p_connection(AddrBlackhole())
 
-        msg = self.setup_addr_msg(2, add_delay=True)
+        msg = self.setup_addr_msg(2)
         addr_source.send_and_ping(msg)
         # pop m_next_addr_send timer
-        self.nodes[0].setmocktime(int(time.time()) + 30 * 60 * 2)
+        self.mocktime += 30 * 60
+        self.nodes[0].setmocktime(self.mocktime)
         receiver_peer.sync_with_ping()
         blackhole_peer.sync_with_ping()
 
