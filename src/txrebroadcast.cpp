@@ -32,12 +32,17 @@ static constexpr std::chrono::hours MAX_ENTRY_AGE = std::chrono::hours(3 * 30 * 
 
 std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 {
+    LogPrintf("ABCD entering GetRebroadcastTransaction\n");
     std::vector<TxIds> rebroadcast_txs;
     std::chrono::microseconds start_time = GetTime<std::chrono::microseconds>();
 
     // If there has not been a cache run since the last block, the fee rate
     // condition will not filter out any transactions, so skip this run.
-    if (m_tip_at_cache_time == ::ChainActive().Tip()) return rebroadcast_txs;
+    if (m_tip_at_cache_time == ::ChainActive().Tip()) {
+        LogPrintf("ABCD skipping run, current time: %d ms\n", GetTime<std::chrono::microseconds>().count());
+        LogPrintf("ABCD tip %d\n", m_tip_at_cache_time->nHeight);
+        return rebroadcast_txs;
+    }
 
     BlockAssembler::Options options;
     options.nBlockMaxWeight = MAX_REBROADCAST_WEIGHT;
@@ -87,11 +92,11 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
 
     std::chrono::microseconds delta1 = after_CNB_time - start_time;
     std::chrono::microseconds delta2 = GetTime<std::chrono::microseconds>() - start_time;
-    LogPrint(BCLog::BENCH, "GetRebroadcastTransactions(): %d µs total, %d µs spent in CreateNewBlock.\n", delta1.count(), delta2.count());
-    LogPrint(BCLog::NET, "Queued %d transactions for attempted rebroadcast, filtered from %d candidates with cached fee rate of %s.\n", rebroadcast_txs.size(), block_template->block.vtx.size() - 1, m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB));
+    LogPrint(BCLog::BENCH, "ABCD GetRebroadcastTransactions(): %d µs total, %d µs spent in CreateNewBlock.\n", delta1.count(), delta2.count());
+    LogPrint(BCLog::NET, "ABCD Queued %d transactions for attempted rebroadcast, filtered from %d candidates with cached fee rate of %s.\n", rebroadcast_txs.size(), block_template->block.vtx.size() - 1, m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB));
 
     for (TxIds ids : rebroadcast_txs) {
-        LogPrint(BCLog::NET, "Attempting to rebroadcast txid: %s, wtxid: %s\n", ids.m_txid.ToString(), ids.m_wtxid.ToString());
+        LogPrint(BCLog::NET, "ABCD Attempting to rebroadcast txid: %s, wtxid: %s\n", ids.m_txid.ToString(), ids.m_wtxid.ToString());
     }
 
     return rebroadcast_txs;

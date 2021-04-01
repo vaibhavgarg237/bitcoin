@@ -1360,6 +1360,12 @@ void PeerManagerImpl::NewPoWValidBlock(const CBlockIndex *pindex, const std::sha
  */
 void PeerManagerImpl::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload)
 {
+    if (pindexNew) {
+        LogPrintf("ABCD starting UpdatedBlockTip block height: %d, at time: %d us\n", pindexNew->nHeight, GetTime<std::chrono::microseconds>().count());
+    } else {
+        LogPrintf("ABCD interesting, UpdatedBlockTip called with pindexNew as nullptr");
+    }
+
     SetBestHeight(pindexNew->nHeight);
     SetServiceFlagsIBDCache(!fInitialDownload);
 
@@ -3562,7 +3568,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
         vRecv >> *pblock;
 
-        LogPrint(BCLog::NET, "received block %s peer=%d\n", pblock->GetHash().ToString(), pfrom.GetId());
+        const auto current_time = GetTime<std::chrono::microseconds>();
+        LogPrint(BCLog::NET, "ABCD received block %s peer=%d, time: %d us\n", pblock->GetHash().ToString(), pfrom.GetId(), current_time.count());
 
         bool forceProcessing = false;
         const uint256 hash(pblock->GetHash());
