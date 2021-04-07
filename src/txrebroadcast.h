@@ -24,6 +24,9 @@ public:
     TxRebroadcastHandler(const CTxMemPool& mempool, const ChainstateManager& chainman, const CChainParams& chainparams);
     ~TxRebroadcastHandler();
 
+    TxRebroadcastHandler(const TxRebroadcastHandler& other) = delete;
+    TxRebroadcastHandler& operator=(const TxRebroadcastHandler& other) = delete;
+
     std::vector<TxIds> GetRebroadcastTransactions();
 
     /** Assemble a block from the highest fee rate packages in the local
