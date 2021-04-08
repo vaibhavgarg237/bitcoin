@@ -58,7 +58,24 @@ private:
     /** Minimum fee rate for package to be included in block */
     CFeeRate m_cached_fee_rate;
 
-    /** Keep track of previous rebroadcast attempts */
+    /** Keep track of previous rebroadcast attempts.
+     *
+     *  There are circumstances where our mempool might know about transactions
+     *  that will never be mined. Two examples:
+     *  1. A software upgrade tightens policy, but the node has not been
+     *  upgraded and thus is accepting transactions that other nodes on the
+     *  network now reject.
+     *  2. An attacker targets the network by sending conflicting transactions
+     *  to nodes based on their distance from a miner.
+     *
+     *  Under such circumstances, we want to avoid wasting a significant amount
+     *  of network bandwidth. Also we want to let transactions genuinely expire
+     *  from the majority of mempools, unless the source wallet decides to
+     *  rebroadcast the transaction.
+     *
+     *  So, we use this tracker to limit the frequency and the maximum number
+     *  of times we will attempt to rebroadcast a transaction.
+     * */
     std::unique_ptr<indexed_rebroadcast_set> m_attempt_tracker;
 
     /** Limit the size of m_attempt_tracker by deleting the oldest entries */
