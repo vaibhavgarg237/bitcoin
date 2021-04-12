@@ -45,6 +45,22 @@ class AddrBlackhole(P2PInterface):
             self.num_ipv4_received += 1
 
 
+class GetAddrStore(P2PInterface):
+    getaddr_received = False
+    num_ipv4_received = 0
+
+    def on_getaddr(self, message):
+        self.getaddr_received = True
+
+    def on_addrv2(self, message):
+        for addr in message.addrs:
+            self.num_ipv4_received += 1
+
+    def on_addr(self, message):
+        for addr in message.addrs:
+            self.num_ipv4_received += 1
+
+
 class AddrTest(BitcoinTestFramework):
     counter = 0
     mocktime = int(time.time())
@@ -55,7 +71,9 @@ class AddrTest(BitcoinTestFramework):
     def run_test(self):
         self.oversized_addr_test()
         self.relay_tests()
-        self.blackhole_tests()
+        self.inbound_blackhole_tests()
+        self.outbound_relay_tests()
+        self.blocksonly_mode_tests()
 
     def setup_addr_msg(self, num):
         addrs = []
@@ -115,7 +133,7 @@ class AddrTest(BitcoinTestFramework):
 
         self.nodes[0].disconnect_p2ps()
 
-    def blackhole_tests(self):
+    def inbound_blackhole_tests(self):
         self.log.info('Check that we only relay addresses to inbound peers who have previously sent us addr related messages')
 
         addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
@@ -132,6 +150,58 @@ class AddrTest(BitcoinTestFramework):
 
         assert_equal(receiver_peer.num_ipv4_received, 2)
         assert_equal(blackhole_peer.num_ipv4_received, 0)
+
+        self.nodes[0].disconnect_p2ps()
+
+    def outbound_relay_tests(self):
+        self.log.info('Test addr relay with outbound peers')
+
+        self.log.info('Check that we send a getaddr message to outbound-full-relay peers')
+        full_outbound_peer = self.nodes[0].add_outbound_p2p_connection(GetAddrStore(), p2p_idx=0, connection_type="outbound-full-relay")
+        full_outbound_peer.sync_with_ping()
+        assert(full_outbound_peer.getaddr_received)
+
+        self.log.info('Check that we do not send a getaddr message to block-relay-only peers')
+        block_relay_peer = self.nodes[0].add_outbound_p2p_connection(GetAddrStore(), p2p_idx=1, connection_type="block-relay-only")
+        block_relay_peer.sync_with_ping()
+        assert_equal(block_relay_peer.getaddr_received, False)
+
+        self.log.info('Check address relay to outbound peers')
+        addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
+
+        msg = self.setup_addr_msg(2)
+        addr_source.send_and_ping(msg)
+        self.mocktime += 30 * 60
+        self.nodes[0].setmocktime(self.mocktime)
+        full_outbound_peer.sync_with_ping()
+        block_relay_peer.sync_with_ping()
+
+        # Check that we forward addresses to outbound-full-relay peers, and not
+        # to outbound block-relay-only peers.
+        assert_equal(full_outbound_peer.num_ipv4_received, 2)
+        assert_equal(block_relay_peer.num_ipv4_received, 0)
+
+        self.nodes[0].disconnect_p2ps()
+
+    def blocksonly_mode_tests(self):
+        self.log.info('Test addr relay in blocks only mode')
+        self.restart_node(0, ["-blocksonly"])
+        self.mocktime = int(time.time())
+
+        self.log.info('Check that we send getaddr messages')
+        full_outbound_peer = self.nodes[0].add_outbound_p2p_connection(GetAddrStore(), p2p_idx=2, connection_type="outbound-full-relay")
+        full_outbound_peer.sync_with_ping()
+        assert(full_outbound_peer.getaddr_received)
+
+        self.log.info('Check that we relay address messages')
+        self.log.info('ABCD----------------- start relay-------------')
+        addr_source = self.nodes[0].add_p2p_connection(P2PInterface())
+        msg = self.setup_addr_msg(2)
+        addr_source.send_and_ping(msg)
+        self.mocktime += 30 * 60
+        self.nodes[0].setmocktime(self.mocktime)
+        full_outbound_peer.sync_with_ping()
+        assert_equal(full_outbound_peer.num_ipv4_received, 2)
 
         self.nodes[0].disconnect_p2ps()
 

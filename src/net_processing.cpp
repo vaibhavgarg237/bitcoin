@@ -2668,6 +2668,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         int64_t nSince = nNow - 10 * 60;
         for (CAddress& addr : vAddr)
         {
+            LogPrintf("ABCD processing addr: %s\n", addr.ToString());
             if (interruptMsgProc)
                 return;
 
@@ -2677,16 +2678,21 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             if (!MayHaveUsefulAddressDB(addr.nServices) && !HasAllDesirableServiceFlags(addr.nServices))
                 continue;
 
-            if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
+            LogPrintf("ABCD nTime: %d, 1st: %s, 2nd: %s\n", addr.nTime, addr.nTime <= 100000000, addr.nTime > nNow + 10 * 60);
+            if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60) {
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
+            }
             pfrom.AddAddressKnown(addr);
             if (m_banman && (m_banman->IsDiscouraged(addr) || m_banman->IsBanned(addr))) {
                 // Do not process banned/discouraged addresses beyond remembering we received them
                 continue;
             }
             bool fReachable = IsReachable(addr);
+            LogPrintf("ABCD nTime > nSince: %s, !pfrom.fGetAddr: %s, vAddr.size < 10: %s, addr.IsRoutable: %s \n", addr.nTime > nSince, !pfrom.fGetAddr, vAddr.size() <= 10, addr.IsRoutable());
+            LogPrintf("ABCD nTime: %d, nSince: %d, delta = %d \n", addr.nTime, nSince, nSince - addr.nTime);
             if (addr.nTime > nSince && !pfrom.fGetAddr && vAddr.size() <= 10 && addr.IsRoutable())
             {
+                LogPrintf("ABCD calling RelayAddress\n");
                 // Relay to a limited number of other nodes
                 RelayAddress(pfrom, addr, fReachable, m_connman);
             }
