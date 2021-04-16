@@ -161,6 +161,12 @@ void TxRebroadcastHandler::CacheMinRebroadcastFee()
     LogPrint(BCLog::BENCH, "Caching minimum fee for rebroadcast to %s, took %d us to calculate.\n", m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB), delta_time.count());
 };
 
+void TxRebroadcastHandler::RemoveFromAttemptTracker(const CTransactionRef& tx) {
+    const auto it = m_attempt_tracker->find(tx->GetWitnessHash());
+    if (it == m_attempt_tracker->end()) return;
+    m_attempt_tracker->erase(it);
+}
+
 void TxRebroadcastHandler::TrimMaxRebroadcast()
 {
     // Delete any entries that are older than MAX_ENTRY_AGE

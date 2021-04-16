@@ -35,6 +35,9 @@ public:
      * */
     void CacheMinRebroadcastFee();
 
+    /** Remove transaction entry from the attempt tracker.*/
+    void RemoveFromAttemptTracker(const CTransactionRef& tx);
+
 private:
     const CTxMemPool& m_mempool;
     const ChainstateManager& m_chainman;
