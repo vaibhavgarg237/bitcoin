@@ -138,7 +138,10 @@ std::vector<TxIds> TxRebroadcastHandler::GetRebroadcastTransactions()
     auto delta1 = after_cnb_time - start_time;
     auto delta2 = GetTime<std::chrono::microseconds>() - start_time;
     LogPrint(BCLog::BENCH, "GetRebroadcastTransactions(): %d us total, %d us spent in CreateNewBlock.\n", delta2.count(), delta1.count());
-    LogPrint(BCLog::NET, "Queued %d transactions for attempted rebroadcast, filtered from %d candidates with cached fee rate of %s.\n", rebroadcast_txs.size(), block_template->block.vtx.size() - 1, m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB));
+
+    auto fee_rate = m_cached_fee_rate.ToString(FeeEstimateMode::SAT_VB);
+    LogPrint(BCLog::NET, "GetRebroadcastTransactions(): block mined %d transactions with %s cached fee rate\n", block_template->block.vtx.size() - 1, fee_rate);
+    LogPrint(BCLog::NET, "GetRebroadcastTransactions(): returning %d transactions for attempted rebroadcast\n", rebroadcast_txs.size());
 
     for (TxIds ids : rebroadcast_txs) {
         LogPrint(BCLog::NET, "Attempting to rebroadcast txid: %s, wtxid: %s\n", ids.m_txid.ToString(), ids.m_wtxid.ToString());
