@@ -4614,6 +4614,13 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
                         State(pto->GetId())->m_recently_announced_invs.insert(hash);
                         vInv.push_back(inv);
                         nRelayedTransactions++;
+
+                        // Update rebroadcast tracker if applicable
+                        auto reb_it = m_txrebroadcast_tracker.find(wtxid);
+                        if (reb_it != m_txrebroadcast_tracker.end()) {
+                            reb_it->second.inv_peers.push_back(pto->GetId());
+                        }
+
                         {
                             // Expire old relay messages
                             while (!g_relay_expiration.empty() && g_relay_expiration.front().first < current_time)
