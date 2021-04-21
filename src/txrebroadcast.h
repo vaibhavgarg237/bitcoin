@@ -8,12 +8,23 @@
 #include <policy/feerate.h>
 #include <txmempool.h>
 #include <validation.h>
+#include <net.h>
 
 struct TxIds {
     TxIds(uint256 txid, uint256 wtxid) : m_txid(txid), m_wtxid(wtxid) {}
 
     const uint256 m_txid;
     const uint256 m_wtxid;
+};
+
+struct RebroadcastCounter {
+    RebroadcastCounter(NodeId peer_id) {
+        setInvSend_peers.push_back(peer_id);
+    }
+
+    std::vector<NodeId> setInvSend_peers;
+    std::vector<NodeId> inv_peers;
+    std::vector<NodeId> getdata_peers;
 };
 
 class indexed_rebroadcast_set;

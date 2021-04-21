@@ -250,7 +250,7 @@ public:
     bool GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) override;
     bool IgnoresIncomingTxs() override { return m_ignore_incoming_txs; }
     void SendPings() override;
-    void RelayTransaction(const uint256& txid, const uint256& wtxid) override;
+    void RelayTransaction(const uint256& txid, const uint256& wtxid, const bool rebroadcast = false) override;
     void SetBestHeight(int height) override { m_best_height = height; };
     void Misbehaving(const NodeId pnode, const int howmuch, const std::string& message) override;
     void ProcessMessage(CNode& pfrom, const std::string& msg_type, CDataStream& vRecv,
@@ -337,6 +337,7 @@ private:
     CTxMemPool& m_mempool;
     TxRequestTracker m_txrequest GUARDED_BY(::cs_main);
     std::unique_ptr<TxRebroadcastHandler> m_txrebroadcast;
+    std::map<uint256 /* wtxid */, RebroadcastCounter> m_txrebroadcast_tracker;
 
     /** The height of the best chain */
     std::atomic<int> m_best_height{-1};
@@ -1476,7 +1477,7 @@ void PeerManagerImpl::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlock
 
         LOCK(cs_main);
         for (auto ids : rebroadcast_txs) {
-            RelayTransaction(ids.m_txid, ids.m_wtxid);
+            RelayTransaction(ids.m_txid, ids.m_wtxid, true);
         }
     }
 
@@ -1559,17 +1560,27 @@ void PeerManagerImpl::SendPings()
     for(auto& it : m_peer_map) it.second->m_ping_queued = true;
 }
 
-void PeerManagerImpl::RelayTransaction(const uint256& txid, const uint256& wtxid)
+void PeerManagerImpl::RelayTransaction(const uint256& txid, const uint256& wtxid, const bool rebroadcast)
 {
-    m_connman.ForEachNode([&txid, &wtxid](CNode* pnode) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
+    m_connman.ForEachNode([&txid, &wtxid, rebroadcast, this](CNode* pnode) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
         AssertLockHeld(::cs_main);
 
         CNodeState* state = State(pnode->GetId());
         if (state == nullptr) return;
+
+        bool success{false};
         if (state->m_wtxid_relay) {
-            pnode->PushTxInventory(wtxid);
+            success = pnode->PushTxInventory(wtxid);
         } else {
-            pnode->PushTxInventory(txid);
+            success = pnode->PushTxInventory(txid);
+        }
+        if (rebroadcast && success) {
+            auto it = m_txrebroadcast_tracker.find(wtxid);
+            if (it == m_txrebroadcast_tracker.end()) {
+                m_txrebroadcast_tracker.emplace(wtxid, pnode->GetId());
+            } else {
+               it->second.setInvSend_peers.push_back(pnode->GetId());
+            }
         }
     });
 }
