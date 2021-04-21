@@ -1795,6 +1795,18 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
 CTransactionRef PeerManagerImpl::FindTxForGetData(const CNode& peer, const GenTxid& gtxid, const std::chrono::seconds mempool_req, const std::chrono::seconds now)
 {
     auto txinfo = m_mempool.info(gtxid);
+
+    // update rebroadcast tracker if applicable
+    auto wtxid = gtxid.GetHash();
+    if (txinfo.tx) {
+        wtxid = txinfo.tx->GetWitnessHash();
+    }
+
+    auto reb_it = m_txrebroadcast_tracker.find(wtxid);
+    if (reb_it != m_txrebroadcast_tracker.end()) {
+       reb_it->second.getdata_peers.push_back(peer.GetId());
+    }
+
     if (txinfo.tx) {
         // If a TX could have been INVed in reply to a MEMPOOL request,
         // or is older than UNCONDITIONAL_RELAY_DELAY, permit the request
