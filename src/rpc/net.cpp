@@ -88,6 +88,41 @@ static RPCHelpMan ping()
     };
 }
 
+static RPCHelpMan getrebroadcastinfo()
+{
+    return RPCHelpMan{"getrebroadcastinfo",
+                "\nReturns rebroadcast stats.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        { RPCResult::Type::NUM, "setInved", "number added to setInventory" },
+                        { RPCResult::Type::NUM, "inved", "number actually sent INV messages" },
+                        { RPCResult::Type::NUM, "requested", "number of peers requested" },
+                    }},
+                RPCExamples{
+                    HelpExampleCli("getrebroadcastinfo", "")
+            + HelpExampleRpc("getrebroadcastinfo", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureNodeContext(request.context);
+    if(!node.peerman || !gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED)) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer or rebroadcast functionality missing or disabled");
+    }
+
+    UniValue info(UniValue::VOBJ);
+    auto stats = node.peerman->GetRebroadcastStats();
+
+    info.pushKV("setInved", stats.setInved);
+    info.pushKV("inved", stats.inved);
+    info.pushKV("requested", stats.requested);
+
+    return info;
+},
+    };
+}
+
 static RPCHelpMan getpeerinfo()
 {
     return RPCHelpMan{"getpeerinfo",
@@ -943,6 +978,7 @@ static const CRPCCommand commands[] =
     { "network",             &getconnectioncount,      },
     { "network",             &ping,                    },
     { "network",             &getpeerinfo,             },
+    { "network",             &getrebroadcastinfo,      },
     { "network",             &addnode,                 },
     { "network",             &disconnectnode,          },
     { "network",             &getaddednodeinfo,        },

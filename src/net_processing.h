@@ -34,6 +34,12 @@ struct CNodeStateStats {
     std::vector<int> vHeightInFlight;
 };
 
+struct RebroadcastStats {
+    int setInved{0};
+    int inved{0};
+    int requested{0};
+};
+
 class PeerManager : public CValidationInterface, public NetEventsInterface
 {
 public:
@@ -44,6 +50,8 @@ public:
 
     /** Get statistics from node state */
     virtual bool GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) = 0;
+
+    virtual RebroadcastStats GetRebroadcastStats() = 0;
 
     /** Whether this node ignores txs received over p2p. */
     virtual bool IgnoresIncomingTxs() = 0;

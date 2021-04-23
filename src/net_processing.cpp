@@ -247,6 +247,7 @@ public:
 
     /** Implement PeerManager */
     void CheckForStaleTipAndEvictPeers() override;
+    RebroadcastStats GetRebroadcastStats() override;
     bool GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) override;
     bool IgnoresIncomingTxs() override { return m_ignore_incoming_txs; }
     void SendPings() override;
@@ -1102,6 +1103,21 @@ PeerRef PeerManagerImpl::RemovePeer(NodeId id)
         m_peer_map.erase(it);
     }
     return ret;
+}
+
+RebroadcastStats PeerManagerImpl::GetRebroadcastStats()
+{
+    // std::map<uint256 /* wtxid */, RebroadcastCounter> m_txrebroadcast_tracker;
+    RebroadcastStats stats;
+
+    for (auto it = m_txrebroadcast_tracker.begin(); it != m_txrebroadcast_tracker.end(); it++) {
+        auto counter = it->second;
+        stats.setInved += counter.setInvSend_peers.size();
+        stats.inved += counter.inv_peers.size();
+        stats.requested += counter.getdata_peers.size();
+    }
+
+    return stats;
 }
 
 bool PeerManagerImpl::GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)

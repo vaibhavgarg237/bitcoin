@@ -25,6 +25,7 @@ from test_framework.p2p import P2PTxInvStore
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_approx,
+    assert_equal,
     assert_greater_than,
     create_confirmed_utxos,
 )
@@ -186,6 +187,10 @@ class NodeRebroadcastTest(BitcoinTestFramework):
             wtxhsh = node.getmempoolentry(txhsh)['wtxid']
             wtxid = int(wtxhsh, 16)
             assert(wtxid not in rebroadcasted_invs)
+
+        rebroadcast_summary = self.nodes[0].getrebroadcastinfo()
+        assert_equal(rebroadcast_summary['setInved'], rebroadcast_summary['inved'])
+        assert_equal(rebroadcast_summary['inved'], rebroadcast_summary['requested'])
 
 
 if __name__ == '__main__':
