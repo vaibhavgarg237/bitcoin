@@ -17,6 +17,7 @@ class P2PDNSSeeds(BitcoinTestFramework):
     def run_test(self):
         self.existing_outbound_connections_test()
         self.existing_block_relay_connections_test()
+        self.init_arg_tests()
 
     def existing_outbound_connections_test(self):
         # Make sure addrman is populated to enter the conditional where we
@@ -45,6 +46,16 @@ class P2PDNSSeeds(BitcoinTestFramework):
             # we still want to query the DNS seeds.
             for i in range(2):
                 self.nodes[0].add_outbound_p2p_connection(P2PInterface(), p2p_idx=i, connection_type="block-relay-only")
+
+    def init_arg_tests(self):
+        self.log.info("Check that setting -connect disables -dnsseed by default")
+        self.nodes[0].stop_node()
+        with(self.nodes[0].assert_debug_log(expected_msgs=["DNS seeding disabled"])):
+            self.start_node(0, ["-connect"])
+
+        self.log.info("Check that running -connect and -dnsseed means DNS logic runs.")
+        with(self.nodes[0].assert_debug_log(expected_msgs=["Loading addresses from DNS seed"], timeout=12)):
+            self.restart_node(0, ["-connect=1", "-dnsseed=1"])
 
 
 if __name__ == '__main__':
