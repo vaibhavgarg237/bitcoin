@@ -1588,6 +1588,8 @@ void CConnman::WakeMessageHandler()
 
 void CConnman::ThreadDNSAddressSeed()
 {
+    LogPrintf("ABCD!!! ThreadDNSAddressSeed\n");
+
     FastRandomContext rng;
     std::vector<std::string> seeds = Params().DNSSeeds();
     Shuffle(seeds.begin(), seeds.end(), rng);
@@ -1618,40 +1620,54 @@ void CConnman::ThreadDNSAddressSeed()
     //   (done in ThreadOpenConnections)
     const std::chrono::seconds seeds_wait_time = (addrman.size() >= DNSSEEDS_DELAY_PEER_THRESHOLD ? DNSSEEDS_DELAY_MANY_PEERS : DNSSEEDS_DELAY_FEW_PEERS);
 
+    LogPrintf("ABCD ThreadDNSAddressSeed: 1\n");
     for (const std::string& seed : seeds) {
+        LogPrintf("ABCD ThreadDNSAddressSeed: 1.1, seeds_right_now: %d\n", seeds_right_now);
         if (seeds_right_now == 0) {
+            LogPrintf("ABCD ThreadDNSAddressSeed: 1.2\n");
             seeds_right_now += DNSSEEDS_TO_QUERY_AT_ONCE;
 
             if (addrman.size() > 0) {
+                LogPrintf("ABCD ThreadDNSAddressSeed: 1.3\n");
                 LogPrintf("Waiting %d seconds before querying DNS seeds.\n", seeds_wait_time.count());
                 std::chrono::seconds to_wait = seeds_wait_time;
                 while (to_wait.count() > 0) {
+                    LogPrintf("ABCD ThreadDNSAddressSeed: 1.4\n");
                     // if sleeping for the MANY_PEERS interval, wake up
                     // early to see if we have enough peers and can stop
                     // this thread entirely freeing up its resources
                     std::chrono::seconds w = std::min(DNSSEEDS_DELAY_FEW_PEERS, to_wait);
+                    LogPrintf("ABCD ThreadDNSAddressSeed: 1.5\n");
                     if (!interruptNet.sleep_for(w)) return;
+                    LogPrintf("ABCD ThreadDNSAddressSeed: 1.6\n");
                     to_wait -= w;
 
+                    LogPrintf("ABCD ThreadDNSAddressSeed: 2\n");
                     int nRelevant = 0;
                     {
                         LOCK(cs_vNodes);
                         for (const CNode* pnode : vNodes) {
-                            if (pnode->fSuccessfullyConnected && pnode->IsOutboundOrBlockRelayConn()) ++nRelevant;
+                            // HERE!
+                            //if (pnode->fSuccessfullyConnected && pnode->IsOutboundOrBlockRelayConn()) ++nRelevant;
+                            if (pnode->fSuccessfullyConnected && pnode->IsFullOutboundConn()) ++nRelevant;
                         }
                     }
+                    LogPrintf("ABCD ThreadDNSAddressSeed: 3, nRelevant: %d\n", nRelevant);
                     if (nRelevant >= 2) {
+                        LogPrintf("ABCD %d nRelevant\n", nRelevant);
                         if (found > 0) {
                             LogPrintf("%d addresses found from DNS seeds\n", found);
-                            LogPrintf("P2P peers available. Finished DNS seeding.\n");
+                            LogPrintf("ABCD P2P peers available. Finished DNS seeding.\n");
                         } else {
-                            LogPrintf("P2P peers available. Skipped DNS seeding.\n");
+                            LogPrintf("ABCD P2P peers available. Skipped DNS seeding.\n");
                         }
                         return;
                     }
                 }
             }
         }
+
+        LogPrintf("ABCD ThreadDNSAddressSeed: 4\n");
 
         if (interruptNet) return;
 
@@ -1693,7 +1709,7 @@ void CConnman::ThreadDNSAddressSeed()
         }
         --seeds_right_now;
     }
-    LogPrintf("%d addresses found from DNS seeds\n", found);
+    LogPrintf("ABCD end: %d addresses found from DNS seeds\n", found);
 }
 
 void CConnman::DumpAddresses()
