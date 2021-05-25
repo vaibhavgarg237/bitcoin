@@ -696,13 +696,17 @@ public:
         }
     }
 
-    void PushTxInventory(const uint256& hash)
+    bool PushTxInventory(const uint256& hash)
     {
-        if (m_tx_relay == nullptr) return;
+        if (m_tx_relay == nullptr) return false;
+
         LOCK(m_tx_relay->cs_tx_inventory);
         if (!m_tx_relay->filterInventoryKnown.contains(hash)) {
             m_tx_relay->setInventoryTxToSend.insert(hash);
+            return true;
         }
+
+        return false;
     }
 
     void CloseSocketDisconnect();

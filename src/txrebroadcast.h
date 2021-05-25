@@ -9,6 +9,7 @@
 #include <policy/feerate.h>
 #include <txmempool.h>
 #include <validation.h>
+#include <net.h>
 
 /** Frequency to run the fee rate cache. */
 constexpr std::chrono::minutes REBROADCAST_CACHE_FREQUENCY{1};
@@ -18,6 +19,23 @@ struct TxIds {
 
     const uint256 m_txid;
     const uint256 m_wtxid;
+};
+
+enum class RebroadcastCounters {
+    IDENTIFIED,
+    QUEUED,
+    INVED,
+    REQUESTED
+};
+
+struct RebroadcastCounter {
+    RebroadcastCounter(NodeId peer_id) {
+        setInvSend_peers.push_back(peer_id);
+    }
+
+    std::vector<NodeId> setInvSend_peers;
+    std::vector<NodeId> inv_peers;
+    std::vector<NodeId> getdata_peers;
 };
 
 class indexed_rebroadcast_set;
@@ -52,6 +70,8 @@ public:
 
     /** Remove transaction entry from the attempt tracker.*/
     void RemoveFromAttemptTracker(const CTransactionRef& tx);
+
+    bool IsRelevant(const uint256& wtxid);
 
     /** Test only */
     void UpdateAttempt(const uint256& wtxid, const int count, const std::chrono::microseconds last_attempt_time);

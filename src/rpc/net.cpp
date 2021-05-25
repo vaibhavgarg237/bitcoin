@@ -101,6 +101,79 @@ static RPCHelpMan ping()
     };
 }
 
+static RPCHelpMan getrebroadcastinfo()
+{
+    return RPCHelpMan{"getrebroadcastinfo",
+                "\nReturns rebroadcast stats.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        { RPCResult::Type::NUM, "identified", "number identified for rebroadcast" },
+                        { RPCResult::Type::NUM, "queued", "number added to setInventory" },
+                        { RPCResult::Type::NUM, "inved", "number actually sent INV messages" },
+                        { RPCResult::Type::NUM, "requested", "number of peers requested" },
+                    }},
+                RPCExamples{
+                    HelpExampleCli("getrebroadcastinfo", "")
+            + HelpExampleRpc("getrebroadcastinfo", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureAnyNodeContext(request.context);
+    if(!node.peerman || !gArgs.GetArg("-rebroadcast", DEFAULT_REBROADCAST_ENABLED)) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer or rebroadcast functionality missing or disabled");
+    }
+
+    UniValue info(UniValue::VOBJ);
+    auto [a, b, c, d] = node.peerman->GetRebroadcastStats();
+
+    info.pushKV("identified", a);
+    info.pushKV("queued", b);
+    info.pushKV("inved", c);
+    info.pushKV("requested", d);
+
+    return info;
+},
+    };
+}
+
+static RPCHelpMan getgeneralbroadcastinfo()
+{
+    return RPCHelpMan{"getgeneralbroadcastinfo",
+                "\nReturns general broadcast stats.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        { RPCResult::Type::NUM, "identified", "number of times RelayTransaction was called" },
+                        { RPCResult::Type::NUM, "queued", "number added to setInventory" },
+                        { RPCResult::Type::NUM, "inved", "number actually sent INV messages" },
+                        { RPCResult::Type::NUM, "requested", "number of peers requested" },
+                    }},
+                RPCExamples{
+                    HelpExampleCli("getgeneralbroadcastinfo", "")
+            + HelpExampleRpc("getgeneralbroadcastinfo", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureAnyNodeContext(request.context);
+    if(!node.peerman) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    UniValue info(UniValue::VOBJ);
+    auto [a, b, c, d] = node.peerman->GetGeneralbroadcastStats();
+
+    info.pushKV("identified", a);
+    info.pushKV("queued", b);
+    info.pushKV("inved", c);
+    info.pushKV("requested", d);
+
+    return info;
+},
+    };
+}
 static RPCHelpMan getpeerinfo()
 {
     return RPCHelpMan{"getpeerinfo",
@@ -954,6 +1027,8 @@ static const CRPCCommand commands[] =
     { "network",             &getconnectioncount,      },
     { "network",             &ping,                    },
     { "network",             &getpeerinfo,             },
+    { "network",             &getrebroadcastinfo,      },
+    { "network",             &getgeneralbroadcastinfo, },
     { "network",             &addnode,                 },
     { "network",             &disconnectnode,          },
     { "network",             &getaddednodeinfo,        },

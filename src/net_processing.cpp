@@ -249,6 +249,8 @@ public:
 
     /** Implement PeerManager */
     void CheckForStaleTipAndEvictPeers() override;
+    std::tuple<int, int, int, int> GetRebroadcastStats() override;
+    std::tuple<int, int, int, int> GetGeneralbroadcastStats() override;
     bool GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) const override;
     bool IgnoresIncomingTxs() override { return m_ignore_incoming_txs; }
     void SendPings() override;
@@ -259,7 +261,7 @@ public:
                         const std::chrono::microseconds time_received, const std::atomic<bool>& interruptMsgProc) override;
 
 private:
-    void _RelayTransaction(const uint256& txid, const uint256& wtxid)
+    void _RelayTransaction(const uint256& txid, const uint256& wtxid, const bool rebroadcast=false)
         EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     /** Consider evicting an outbound peer based on the amount of time they've been behind our tip */
@@ -342,6 +344,8 @@ private:
     CTxMemPool& m_mempool;
     TxRequestTracker m_txrequest GUARDED_BY(::cs_main);
     const std::unique_ptr<TxRebroadcastHandler> m_txrebroadcast;
+    std::map<RebroadcastCounters, int> m_txrebroadcast_tracker;
+    std::map<RebroadcastCounters, int> m_generalbroadcast_tracker;
 
     /** The height of the best chain */
     std::atomic<int> m_best_height{-1};
@@ -1110,6 +1114,26 @@ PeerRef PeerManagerImpl::RemovePeer(NodeId id)
     return ret;
 }
 
+std::tuple<int, int, int, int> PeerManagerImpl::GetRebroadcastStats()
+{
+    auto identified = m_txrebroadcast_tracker[RebroadcastCounters::IDENTIFIED];
+    auto queued = m_txrebroadcast_tracker[RebroadcastCounters::QUEUED];
+    auto inved = m_txrebroadcast_tracker[RebroadcastCounters::INVED];
+    auto requested = m_txrebroadcast_tracker[RebroadcastCounters::REQUESTED];
+
+    return std::make_tuple(identified, queued, inved, requested);
+}
+
+std::tuple<int, int, int, int> PeerManagerImpl::GetGeneralbroadcastStats()
+{
+    auto identified = m_generalbroadcast_tracker[RebroadcastCounters::IDENTIFIED];
+    auto queued = m_generalbroadcast_tracker[RebroadcastCounters::QUEUED];
+    auto inved = m_generalbroadcast_tracker[RebroadcastCounters::INVED];
+    auto requested = m_generalbroadcast_tracker[RebroadcastCounters::REQUESTED];
+
+    return std::make_tuple(identified, queued, inved, requested);
+}
+
 bool PeerManagerImpl::GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) const
 {
     {
@@ -1484,9 +1508,11 @@ void PeerManagerImpl::UpdatedBlockTip(const std::shared_ptr<const CBlock>& block
     if (m_txrebroadcast) {
         const std::vector<TxIds> rebroadcast_txs = m_txrebroadcast->GetRebroadcastTransactions(block, *pindexNew);
 
+        m_txrebroadcast_tracker[RebroadcastCounters::IDENTIFIED] += rebroadcast_txs.size();
+
         LOCK(cs_main);
         for (auto ids : rebroadcast_txs) {
-            _RelayTransaction(ids.m_txid, ids.m_wtxid);
+            _RelayTransaction(ids.m_txid, ids.m_wtxid, true);
         }
     }
 
@@ -1571,20 +1597,39 @@ void PeerManagerImpl::SendPings()
 
 void PeerManagerImpl::RelayTransaction(const uint256& txid, const uint256& wtxid)
 {
-    WITH_LOCK(cs_main, _RelayTransaction(txid, wtxid););
+    WITH_LOCK(cs_main, _RelayTransaction(txid, wtxid, false););
 }
 
-void PeerManagerImpl::_RelayTransaction(const uint256& txid, const uint256& wtxid)
+void PeerManagerImpl::_RelayTransaction(const uint256& txid, const uint256& wtxid, const bool rebroadcast)
 {
-    m_connman.ForEachNode([&txid, &wtxid](CNode* pnode) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
+    m_connman.ForEachNode([&txid, &wtxid, rebroadcast, this](CNode* pnode) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
         AssertLockHeld(::cs_main);
 
         CNodeState* state = State(pnode->GetId());
         if (state == nullptr) return;
+
+        bool success{false};
         if (state->m_wtxid_relay) {
-            pnode->PushTxInventory(wtxid);
+            success = pnode->PushTxInventory(wtxid);
         } else {
-            pnode->PushTxInventory(txid);
+            success = pnode->PushTxInventory(txid);
+        }
+
+        if (rebroadcast) {
+            bool relay_enabled = false;
+            if (pnode->m_tx_relay) {
+                relay_enabled = WITH_LOCK(pnode->m_tx_relay->cs_filter, return pnode->m_tx_relay->fRelayTxes);
+            }
+
+            if (success && relay_enabled) {
+                m_txrebroadcast_tracker[RebroadcastCounters::QUEUED] += 1;
+            }
+            return;
+        }
+
+        m_generalbroadcast_tracker[RebroadcastCounters::IDENTIFIED] += 1;
+        if (success) {
+            m_generalbroadcast_tracker[RebroadcastCounters::QUEUED] += 1;
         }
     });
 }
@@ -1854,6 +1899,16 @@ void PeerManagerImpl::ProcessGetData(CNode& pfrom, Peer& peer, const std::atomic
 
         CTransactionRef tx = FindTxForGetData(pfrom, ToGenTxid(inv), mempool_req, now);
         if (tx) {
+            // update rebroadcast tracker if applicable
+            auto txid = tx->GetHash();
+            auto wtxid = tx->GetWitnessHash();
+            if (m_txrebroadcast->IsRelevant(wtxid)) {
+                m_txrebroadcast_tracker[RebroadcastCounters::REQUESTED] += 1;
+                LogPrint(BCLog::NET, "Rebroadcast tx requested from peer: %d. txid: %s wtxid: %s\n", pfrom.GetId(), txid.ToString(), wtxid.ToString());
+            } else {
+                m_generalbroadcast_tracker[RebroadcastCounters::REQUESTED] += 1;
+            }
+
             // WTX and WITNESS_TX imply we serialize with witness
             int nSendFlags = (inv.IsMsgTx() ? SERIALIZE_TRANSACTION_NO_WITNESS : 0);
             m_connman.PushMessage(&pfrom, msgMaker.Make(nSendFlags, NetMsgType::TX, *tx));
@@ -4610,6 +4665,15 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
                         State(pto->GetId())->m_recently_announced_invs.insert(hash);
                         vInv.push_back(inv);
                         nRelayedTransactions++;
+
+                        // Update rebroadcast tracker if applicable
+                        if (m_txrebroadcast->IsRelevant(wtxid)) {
+                            m_txrebroadcast_tracker[RebroadcastCounters::INVED] += 1;
+                            LogPrint(BCLog::NET, "Sending INV for rebroadcast txid: %s wtxid %s to peer=%d\n", txid.ToString(), wtxid.ToString(), pto->GetId());
+                        } else {
+                            m_generalbroadcast_tracker[RebroadcastCounters::INVED] += 1;
+                        }
+
                         {
                             // Expire old relay messages
                             while (!g_relay_expiration.empty() && g_relay_expiration.front().first < current_time)
