@@ -889,7 +889,8 @@ public:
      * Attempts to open a connection. Currently only used from tests.
      *
      * @param[in]   address     Address of node to try connecting to
-     * @param[in]   conn_type   ConnectionType::OUTBOUND or ConnectionType::BLOCK_RELAY
+     * @param[in]   conn_type   ConnectionType::OUTBOUND, ConnectionType::BLOCK_RELAY
+     *                          or ConnectionType::ADDR_FETCH permitted
      * @return      bool        Returns false if there are no available
      *                          slots for this connection:
      *                          - conn_type not a supported ConnectionType

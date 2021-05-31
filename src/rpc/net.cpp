@@ -337,7 +337,7 @@ static RPCHelpMan addconnection()
         "\nOpen an outbound connection to a specified node. This RPC is for testing only.\n",
         {
             {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The IP address and port to attempt connecting to."},
-            {"connection_type", RPCArg::Type::STR, RPCArg::Optional::NO, "Type of connection to open, either \"outbound-full-relay\" or \"block-relay-only\"."},
+            {"connection_type", RPCArg::Type::STR, RPCArg::Optional::NO, "Type of connection to open, either \"outbound-full-relay\", \"block-relay-only\", or \"addr-fetch\"."},
         },
         RPCResult{
             RPCResult::Type::OBJ, "", "",
@@ -359,10 +359,13 @@ static RPCHelpMan addconnection()
     const std::string address = request.params[0].get_str();
     const std::string conn_type_in{TrimString(request.params[1].get_str())};
     ConnectionType conn_type{};
+
     if (conn_type_in == "outbound-full-relay") {
         conn_type = ConnectionType::OUTBOUND_FULL_RELAY;
     } else if (conn_type_in == "block-relay-only") {
         conn_type = ConnectionType::BLOCK_RELAY;
+    } else if (conn_type_in == "addr-fetch") {
+        conn_type = ConnectionType::ADDR_FETCH;
     } else {
         throw JSONRPCError(RPC_INVALID_PARAMETER, self.ToString());
     }

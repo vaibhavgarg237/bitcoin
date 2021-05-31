@@ -1166,9 +1166,20 @@ void CConnman::CreateNodeFromAcceptedSocket(SOCKET hSocket,
 
 bool CConnman::AddConnection(const std::string& address, ConnectionType conn_type)
 {
-    if (conn_type != ConnectionType::OUTBOUND_FULL_RELAY && conn_type != ConnectionType::BLOCK_RELAY) return false;
+    int max_connections;
 
-    const int max_connections = conn_type == ConnectionType::OUTBOUND_FULL_RELAY ? m_max_outbound_full_relay : m_max_outbound_block_relay;
+    switch(conn_type) {
+        case ConnectionType::INBOUND:
+        case ConnectionType::MANUAL:
+        case ConnectionType::FEELER:
+            return false;
+        case ConnectionType::OUTBOUND_FULL_RELAY:
+            max_connections = m_max_outbound_full_relay;
+        case ConnectionType::BLOCK_RELAY:
+            max_connections = m_max_outbound_block_relay;
+        case ConnectionType::ADDR_FETCH:
+            max_connections = 9; //arbitrary, current number of seeds in params
+    }
 
     // Count existing connections
     int existing_connections = WITH_LOCK(cs_vNodes,
