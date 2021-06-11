@@ -11,7 +11,8 @@ from test_framework.messages import (
     NODE_NETWORK,
     NODE_WITNESS,
     msg_addr,
-    msg_getaddr
+    msg_getaddr,
+    msg_verack
 )
 from test_framework.p2p import P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
@@ -46,6 +47,9 @@ class GetAddrStore(P2PInterface):
 
     def addr_received(self):
         return self.num_ipv4_received != 0
+
+    def on_version(self, message):
+        self.send_message(msg_verack())
 
 
 class AddrTest(BitcoinTestFramework):

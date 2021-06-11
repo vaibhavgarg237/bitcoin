@@ -496,6 +496,25 @@ public:
         return m_conn_type == ConnectionType::INBOUND;
     }
 
+    bool InitiateAddrRelayWithConn() const {
+        switch(m_conn_type) {
+            case ConnectionType::MANUAL:
+            case ConnectionType::FEELER:
+            case ConnectionType::OUTBOUND_FULL_RELAY:
+            case ConnectionType::ADDR_FETCH:
+                return true;
+            case ConnectionType::INBOUND:
+            // To avoid relaying self announcements to inbound connections that
+            // certainly will not forward them to other nodes on the network,
+            // we wait for them to initiate addr relay with us.
+            case ConnectionType::BLOCK_RELAY:
+            // We do not participate in addr relay with outbound
+            // block-relay-only connections to prevent adversaries from
+            // inferring these links from our addr traffic.
+                return false;
+        }
+    }
+
     bool ExpectServicesFromConn() const {
         switch (m_conn_type) {
             case ConnectionType::INBOUND:
